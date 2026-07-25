@@ -366,6 +366,22 @@ class Distan_Admin {
 					</details>
 				</template>
 
+				<template x-if="manifest && manifest.has_modules">
+					<details class="hgp-details is-warn">
+						<summary><?php esc_html_e( 'file:// で開くと一部の JavaScript が動作しません', 'distan' ); ?></summary>
+						<p class="hgp-hint">
+							<?php esc_html_e( '生成物に ES modules（type="module" / importmap）が含まれています。ブロックテーマでよく使われますが、ブラウザの仕様により、ファイルをダブルクリックして file:// で開くと読み込めません。', 'distan' ); ?>
+						</p>
+						<p class="hgp-hint">
+							<?php esc_html_e( 'Web サーバー（納品先）では正常に動作します。ローカルで確認する場合は、出力先で簡易サーバーを立ててください。', 'distan' ); ?>
+						</p>
+						<pre class="hgp-code">python3 -m http.server 8000</pre>
+						<p class="hgp-hint">
+							<?php esc_html_e( 'クラシックテーマで ES modules を使わずに作ると、この制約は起きません。', 'distan' ); ?>
+						</p>
+					</details>
+				</template>
+
 				<template x-if="manifest && manifest.files.indexOf('404.html') !== -1">
 					<details class="hgp-details">
 						<summary><?php esc_html_e( '404ページのサーバー設定', 'distan' ); ?></summary>

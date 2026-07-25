@@ -4,7 +4,7 @@ Tags: static site generator, static, export, html, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.9.9
+Stable tag: 0.9.11
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -65,5 +65,7 @@ Yes, with a classic theme. Block themes load their JavaScript as ES modules, whi
 
 == Changelog ==
 
-= 0.9.9 =
+= 0.9.11 =
 * Initial public release.
+* Added a warning when a page-cache plugin is active.
+* Added a warning when the output contains ES modules that will not load over file://.

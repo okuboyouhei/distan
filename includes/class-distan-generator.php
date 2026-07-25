@@ -88,6 +88,10 @@ class Distan_Generator {
 
 			$job['written'][] = $item['path'];
 			$job['assets']    = array_merge( $job['assets'], $result['assets'] );
+
+			if ( ! empty( $result['has_modules'] ) ) {
+				$job['has_modules'] = true;
+			}
 		}
 
 		$done = $job['index'] >= $job['total'];
@@ -180,7 +184,19 @@ class Distan_Generator {
 			);
 		}
 
-		return array( 'assets' => $rewritten['assets'] );
+		// Detect ES modules. They are valid on a web server but cannot load
+		// over file://, so a deliverable that ships them will look broken when
+		// opened by double-click. Flag it so the run can warn, once, at the end.
+		$has_modules = (bool) preg_match(
+			'#<script[^>]+type=([\'"])module\1#i',
+			$rewritten['html']
+		) || false !== stripos( $rewritten['html'], 'type="importmap"' )
+			|| false !== stripos( $rewritten['html'], "type='importmap'" );
+
+		return array(
+			'assets'      => $rewritten['assets'],
+			'has_modules' => $has_modules,
+		);
 	}
 
 	/**
@@ -450,6 +466,7 @@ class Distan_Generator {
 				'added'    => array_values( array_diff( $current, $previous ) ),
 				'broken'   => isset( $job['broken'] ) ? $job['broken'] : array(),
 				'cleaned'  => isset( $job['cleaned'] ) ? $job['cleaned'] : array(),
+				'has_modules' => ! empty( $job['has_modules'] ),
 				'finished' => time(),
 			),
 			false

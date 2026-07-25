@@ -33,6 +33,7 @@ class Distan_Env {
 			self::check_output_dir(),
 			self::check_image_library(),
 			self::check_execution_time(),
+			self::check_cache_plugins(),
 		);
 	}
 
@@ -281,6 +282,69 @@ class Distan_Env {
 			self::STATUS_WARNING === $status
 				? __( '短いため、1バッチあたりの生成件数を小さくしてください。生成自体は分割実行されます。', 'distan' )
 				: ''
+		);
+	}
+
+	/**
+	 * Warn about page-cache plugins.
+	 *
+	 * A caching plugin serves the loopback request a cached copy, so edits
+	 * silently fail to appear in the output. There is no error — the run
+	 * succeeds and the deliverable is quietly stale — which makes this the
+	 * worst failure mode Distan has. Detection is best-effort by active
+	 * plugin path; it never blocks generation.
+	 */
+	public static function check_cache_plugins(): array {
+		$known = array(
+			'wp-super-cache/wp-cache.php'                => 'WP Super Cache',
+			'w3-total-cache/w3-total-cache.php'          => 'W3 Total Cache',
+			'litespeed-cache/litespeed-cache.php'        => 'LiteSpeed Cache',
+			'wp-fastest-cache/wpFastestCache.php'        => 'WP Fastest Cache',
+			'wp-rocket/wp-rocket.php'                    => 'WP Rocket',
+			'cache-enabler/cache-enabler.php'            => 'Cache Enabler',
+			'comet-cache/comet-cache.php'                => 'Comet Cache',
+			'hummingbird-performance/wp-hummingbird.php' => 'Hummingbird',
+		);
+
+		$active = (array) get_option( 'active_plugins', array() );
+
+		if ( is_multisite() ) {
+			$network = (array) get_site_option( 'active_sitewide_plugins', array() );
+			$active  = array_merge( $active, array_keys( $network ) );
+		}
+
+		$found = array();
+
+		foreach ( $active as $plugin ) {
+			if ( isset( $known[ $plugin ] ) && ! in_array( $known[ $plugin ], $found, true ) ) {
+				$found[] = $known[ $plugin ];
+			}
+		}
+
+		// A persistent object cache does not cache rendered pages, but a
+		// full-page drop-in (advanced-cache.php) does.
+		$has_advanced_cache = defined( 'WP_CACHE' ) && WP_CACHE && file_exists( WP_CONTENT_DIR . '/advanced-cache.php' );
+
+		if ( empty( $found ) && ! $has_advanced_cache ) {
+			return self::result(
+				'cache',
+				__( 'キャッシュプラグイン', 'distan' ),
+				self::STATUS_OK,
+				__( '検出されませんでした', 'distan' ),
+				''
+			);
+		}
+
+		$detail = ! empty( $found )
+			? implode( ', ', $found )
+			: __( 'ページキャッシュ (advanced-cache.php)', 'distan' );
+
+		return self::result(
+			'cache',
+			__( 'キャッシュプラグイン', 'distan' ),
+			self::STATUS_WARNING,
+			$detail,
+			__( 'ページキャッシュが有効です。生成時に古いキャッシュが取得され、編集内容が反映されないことがあります。生成前にキャッシュを削除するか、生成用の環境では無効化してください。', 'distan' )
 		);
 	}
 
