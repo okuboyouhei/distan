@@ -1,0 +1,518 @@
+<?php
+/**
+ * Admin screen.
+ *
+ * @package Distan
+ */
+
+defined( 'ABSPATH' ) || exit;
+
+/**
+ * Admin UI.
+ */
+class Distan_Admin {
+
+	public const MENU_SLUG = 'distan';
+
+	/**
+	 * Hook suffix of our page, for scoped enqueueing.
+	 */
+	private string $hook_suffix = '';
+
+	/**
+	 * Constructor.
+	 */
+	public function __construct() {
+		add_action( 'admin_menu', array( $this, 'register_menu' ) );
+		add_action( 'admin_enqueue_scripts', array( $this, 'enqueue' ) );
+		add_action( 'admin_init', array( $this, 'ensure_secret' ) );
+		add_action( 'admin_init', array( $this, 'register_settings' ) );
+		add_action( 'admin_post_distan_download_zip', array( $this, 'download_zip' ) );
+		add_action( 'admin_post_distan_download_report', array( $this, 'download_report' ) );
+	}
+
+	/**
+	 * Stream a freshly built ZIP of the output directory, then delete it.
+	 */
+	public function download_zip(): void {
+		if ( ! current_user_can( Distan::capability() ) ) {
+			wp_die( esc_html__( '権限がありません。', 'distan' ), '', array( 'response' => 403 ) );
+		}
+
+		check_admin_referer( 'distan_download' );
+
+		if ( ! Distan_Report::can_zip() ) {
+			wp_die( esc_html__( 'この環境ではZIPを作成できません（ZipArchive が利用できません）。', 'distan' ) );
+		}
+
+		$manifest = Distan_Generator::manifest();
+		$zip_path = Distan_Report::build_zip(
+			$manifest,
+			array( 'link_style' => Distan::settings()['link_style'] )
+		);
+
+		if ( null === $zip_path || ! is_file( $zip_path ) ) {
+			wp_die( esc_html__( 'ZIPの作成に失敗しました。先に生成を実行してください。', 'distan' ) );
+		}
+
+		self::stream_and_delete( $zip_path, 'application/zip' );
+	}
+
+	/**
+	 * Stream the latest Markdown report.
+	 */
+	public function download_report(): void {
+		if ( ! current_user_can( Distan::capability() ) ) {
+			wp_die( esc_html__( '権限がありません。', 'distan' ), '', array( 'response' => 403 ) );
+		}
+
+		check_admin_referer( 'distan_download' );
+
+		$path = (string) get_option( 'distan_last_report', '' );
+
+		if ( '' === $path || ! is_file( $path ) ) {
+			wp_die( esc_html__( 'レポートが見つかりません。先に生成を実行してください。', 'distan' ) );
+		}
+
+		// Containment: the report must live in our work directory.
+		if ( ! Distan_Paths::is_contained( $path, Distan_Paths::work_root() ) ) {
+			wp_die( esc_html__( '不正なパスです。', 'distan' ) );
+		}
+
+		header( 'Content-Type: text/markdown; charset=utf-8' );
+		header( 'Content-Disposition: attachment; filename="' . basename( $path ) . '"' );
+		header( 'Content-Length: ' . (string) filesize( $path ) );
+		readfile( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
+		exit;
+	}
+
+	/**
+	 * Send a file as a download and remove it afterwards.
+	 */
+	private static function stream_and_delete( string $path, string $mime ): void {
+		if ( ! Distan_Paths::is_contained( $path, Distan_Paths::work_root() ) ) {
+			wp_die( esc_html__( '不正なパスです。', 'distan' ) );
+		}
+
+		nocache_headers();
+		header( 'Content-Type: ' . $mime );
+		header( 'Content-Disposition: attachment; filename="' . basename( $path ) . '"' );
+		header( 'Content-Length: ' . (string) filesize( $path ) );
+
+		readfile( $path ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_readfile
+
+		wp_delete_file( $path );
+		exit;
+	}
+
+	/**
+	 * Register the single option and its sanitizer.
+	 */
+	public function register_settings(): void {
+		register_setting(
+			'distan_settings_group',
+			Distan::OPTION_KEY,
+			array(
+				'type'              => 'array',
+				'sanitize_callback' => array( $this, 'sanitize_settings' ),
+				'default'           => Distan::defaults(),
+			)
+		);
+	}
+
+	/**
+	 * Sanitize submitted settings.
+	 *
+	 * @param mixed $input Raw input.
+	 * @return array<string, mixed>
+	 */
+	public function sanitize_settings( $input ): array {
+		$defaults = Distan::defaults();
+
+		if ( ! is_array( $input ) ) {
+			return $defaults;
+		}
+
+		$out = array();
+
+		$out['site_url'] = isset( $input['site_url'] )
+			? esc_url_raw( trim( (string) $input['site_url'] ) )
+			: '';
+
+		$style              = isset( $input['path_style'] ) ? (string) $input['path_style'] : 'directory';
+		$out['path_style']  = in_array( $style, array( 'directory', 'flat' ), true ) ? $style : 'directory';
+
+		$link              = isset( $input['link_style'] ) ? (string) $input['link_style'] : 'relative';
+		$out['link_style'] = in_array( $link, array( 'relative', 'absolute' ), true ) ? $link : 'relative';
+
+		$out['clean_html']    = ! empty( $input['clean_html'] );
+		$out['strip_noindex'] = ! empty( $input['strip_noindex'] );
+		$out['keep_indent'] = isset( $input['keep_indent'] ) ? ! empty( $input['keep_indent'] ) : true;
+
+		// Output dir is not editable from the form yet; preserve what exists.
+		$existing          = Distan::settings();
+		$out['output_dir'] = (string) $existing['output_dir'];
+
+		return $out;
+	}
+
+	/**
+	 * Generate the render secret once, on first admin load.
+	 */
+	public function ensure_secret(): void {
+		if ( ! get_option( 'distan_render_secret' ) ) {
+			add_option( 'distan_render_secret', wp_generate_password( 40, false ), '', false );
+		}
+	}
+
+	/**
+	 * Top-level menu.
+	 */
+	public function register_menu(): void {
+		$this->hook_suffix = (string) add_menu_page(
+			__( 'Distan', 'distan' ),
+			__( 'Distan', 'distan' ),
+			Distan::capability(),
+			self::MENU_SLUG,
+			array( $this, 'render_page' ),
+			'dashicons-download',
+			80
+		);
+	}
+
+	/**
+	 * Assets, scoped to our page only.
+	 *
+	 * Alpine must be defined after our component registration, so our script
+	 * is declared as a dependency of Alpine rather than the other way round.
+	 * (Lesson carried over from HXFE.)
+	 *
+	 * @param string $hook Current admin page hook.
+	 */
+	public function enqueue( $hook ): void {
+		if ( $hook !== $this->hook_suffix ) {
+			return;
+		}
+
+		wp_enqueue_style(
+			'distan-admin',
+			DISTAN_URL . 'assets/css/distan-admin.css',
+			array(),
+			DISTAN_VERSION
+		);
+
+		wp_enqueue_script(
+			'distan-admin',
+			DISTAN_URL . 'assets/js/distan-admin.js',
+			array(),
+			DISTAN_VERSION,
+			true
+		);
+
+		wp_localize_script(
+			'distan-admin',
+			'distanData',
+			array(
+				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+				'nonce'   => wp_create_nonce( 'distan_ajax' ),
+				'i18n'    => array(
+					'checking' => __( '確認中…', 'distan' ),
+					'failed'   => __( '確認に失敗しました。', 'distan' ),
+				),
+			)
+		);
+
+		// Alpine depends on our script, so our x-data component exists first.
+		wp_enqueue_script(
+			'distan-alpine',
+			DISTAN_URL . 'assets/js/alpine.min.js',
+			array( 'distan-admin' ),
+			'3.15.12',
+			true
+		);
+	}
+
+	/**
+	 * Page markup.
+	 */
+	public function render_page(): void {
+		if ( ! current_user_can( Distan::capability() ) ) {
+			wp_die( esc_html__( 'このページを表示する権限がありません。', 'distan' ) );
+		}
+
+		$settings = Distan::settings();
+		?>
+		<div class="wrap distan-wrap" x-data="distanAdmin" x-cloak>
+			<h1><?php esc_html_e( 'Distan', 'distan' ); ?></h1>
+			<p class="distan-tagline">WordPress Development Environment &rarr; Static Site Generator</p>
+
+			<p class="distan-lede">
+				<?php esc_html_e( 'WordPress で作ったページを、納品できる静的HTMLとして書き出します。出力内容はテーマの出力に従うため、納品前に実物を確認してください。', 'distan' ); ?>
+			</p>
+
+			<!-- Environment -->
+			<section class="hgp-card">
+				<div class="hgp-card__head">
+					<h2><?php esc_html_e( '環境', 'distan' ); ?></h2>
+					<button type="button" class="button" @click="runEnvCheck()" :disabled="envLoading">
+						<span x-show="!envLoading"><?php esc_html_e( '確認する', 'distan' ); ?></span>
+						<span x-show="envLoading" x-cloak><?php esc_html_e( '確認中…', 'distan' ); ?></span>
+					</button>
+				</div>
+
+				<p class="hgp-empty" x-show="!envResults.length && !envError">
+					<?php esc_html_e( '生成に必要な条件を満たしているか確認します。ループバック通信だけが必須です。', 'distan' ); ?>
+				</p>
+
+				<div class="hgp-alert is-error" x-show="envError" x-cloak x-text="envError"></div>
+
+				<table class="hgp-table" x-show="envResults.length" x-cloak>
+					<tbody>
+						<template x-for="row in envResults" :key="row.id">
+							<tr>
+								<td class="hgp-table__status">
+									<span class="hgp-badge" :class="'is-' + row.status" x-text="statusLabel(row.status)"></span>
+								</td>
+								<th scope="row" x-text="row.label"></th>
+								<td>
+									<code class="hgp-detail" x-text="row.detail"></code>
+									<p class="hgp-hint" x-show="row.hint" x-text="row.hint"></p>
+								</td>
+							</tr>
+						</template>
+					</tbody>
+				</table>
+			</section>
+
+			<!-- Generate -->
+			<section class="hgp-card">
+				<div class="hgp-card__head">
+					<h2><?php esc_html_e( '生成', 'distan' ); ?></h2>
+					<div class="hgp-card__actions">
+						<label class="hgp-batch">
+							<?php esc_html_e( '1回あたり', 'distan' ); ?>
+							<input type="number" min="1" max="20" x-model.number="batchSize">
+							<?php esc_html_e( 'ページ', 'distan' ); ?>
+						</label>
+						<button type="button" class="button button-primary" @click="startGeneration()" :disabled="genRunning">
+							<span x-show="!genRunning"><?php esc_html_e( '静的HTMLを書き出す', 'distan' ); ?></span>
+							<span x-show="genRunning" x-cloak><?php esc_html_e( '書き出し中…', 'distan' ); ?></span>
+						</button>
+					</div>
+				</div>
+
+				<div class="hgp-alert is-error" x-show="genError" x-cloak x-text="genError"></div>
+
+				<div x-show="genTotal > 0" x-cloak class="hgp-progress">
+					<div class="hgp-bar"><div class="hgp-bar__fill" :style="'width:' + percent() + '%'"></div></div>
+					<p class="hgp-progress__label">
+						<span x-text="genIndex"></span> / <span x-text="genTotal"></span>
+						<?php esc_html_e( 'ページ', 'distan' ); ?>
+					</p>
+				</div>
+
+				<template x-if="manifest">
+					<div class="hgp-downloads">
+						<?php $dl_nonce = wp_create_nonce( 'distan_download' ); ?>
+						<?php if ( Distan_Report::can_zip() ) : ?>
+							<a class="button button-primary"
+								href="<?php echo esc_url( admin_url( 'admin-post.php?action=distan_download_zip&_wpnonce=' . $dl_nonce ) ); ?>">
+								<?php esc_html_e( 'ZIPをダウンロード', 'distan' ); ?>
+							</a>
+						<?php else : ?>
+							<span class="hgp-hint">
+								<?php esc_html_e( 'この環境ではZIPを作成できません（ZipArchive が無効）。', 'distan' ); ?>
+							</span>
+						<?php endif; ?>
+						<a class="button"
+							href="<?php echo esc_url( admin_url( 'admin-post.php?action=distan_download_report&_wpnonce=' . $dl_nonce ) ); ?>">
+							<?php esc_html_e( '差分レポート（.md）', 'distan' ); ?>
+						</a>
+					</div>
+				</template>
+
+				<template x-if="manifest">
+					<div class="hgp-stats">
+						<div class="hgp-stat">
+							<span class="hgp-stat__num" x-text="manifest.files.length"></span>
+							<span class="hgp-stat__label"><?php esc_html_e( '出力ファイル', 'distan' ); ?></span>
+						</div>
+						<div class="hgp-stat">
+							<span class="hgp-stat__num" x-text="manifest.added.length"></span>
+							<span class="hgp-stat__label"><?php esc_html_e( '追加', 'distan' ); ?></span>
+						</div>
+						<div class="hgp-stat">
+							<span class="hgp-stat__num" x-text="(manifest.cleaned || []).length"></span>
+							<span class="hgp-stat__label"><?php esc_html_e( '出力先から削除', 'distan' ); ?></span>
+						</div>
+						<div class="hgp-stat" :class="(manifest.broken || []).length ? 'is-warn' : ''">
+							<span class="hgp-stat__num" x-text="(manifest.broken || []).length"></span>
+							<span class="hgp-stat__label"><?php esc_html_e( 'リンク切れ', 'distan' ); ?></span>
+						</div>
+					</div>
+				</template>
+
+				<template x-if="genErrors.length">
+					<details class="hgp-details is-error" open>
+						<summary>
+							<?php esc_html_e( '書き出せなかったページ', 'distan' ); ?>
+							(<span x-text="genErrors.length"></span>)
+						</summary>
+						<table class="hgp-table hgp-table--pairs">
+							<template x-for="e in genErrors" :key="e.url">
+								<tr><td><code x-text="e.url"></code></td><td x-text="e.message"></td></tr>
+							</template>
+						</table>
+					</details>
+				</template>
+
+				<template x-if="manifest && manifest.files.indexOf('404.html') !== -1">
+					<details class="hgp-details">
+						<summary><?php esc_html_e( '404ページのサーバー設定', 'distan' ); ?></summary>
+						<p class="hgp-hint">
+							<?php esc_html_e( '404.html を書き出しました。存在しないURLでこのページを表示するには、サーバー側の設定が必要です。設定できない場合、サーバー既定の404画面が表示されます。', 'distan' ); ?>
+						</p>
+						<p class="hgp-hint"><strong>Apache</strong>（<code>.htaccess</code>）</p>
+						<pre class="hgp-code">ErrorDocument 404 /404.html</pre>
+						<p class="hgp-hint"><strong>nginx</strong></p>
+						<pre class="hgp-code">error_page 404 /404.html;</pre>
+						<p class="hgp-hint">
+							<?php esc_html_e( 'Netlify や Cloudflare Pages では、ルート直下の 404.html が自動的に使われるため設定は不要です。なお 404ページ内のリンクは、どの階層で表示されても壊れないよう常に公開URLで書き出しています。', 'distan' ); ?>
+						</p>
+					</details>
+				</template>
+
+				<template x-if="manifest && manifest.broken && manifest.broken.length">
+					<details class="hgp-details is-warn">
+						<summary>
+							<?php esc_html_e( 'リンク切れ', 'distan' ); ?>
+							(<span x-text="manifest.broken.length"></span>)
+						</summary>
+						<p class="hgp-hint">
+							<?php esc_html_e( 'リンク先のファイルが書き出されていません。テーマがカテゴリーや著者アーカイブへリンクしている場合に起きます。自動では修正しません。', 'distan' ); ?>
+						</p>
+						<table class="hgp-table hgp-table--pairs">
+							<template x-for="b in manifest.broken" :key="b.from + b.to">
+								<tr><td><code x-text="b.from"></code></td><td><code x-text="b.to"></code></td></tr>
+							</template>
+						</table>
+					</details>
+				</template>
+
+				<template x-if="manifest && manifest.removed && manifest.removed.length">
+					<details class="hgp-details is-warn">
+						<summary>
+							<?php esc_html_e( '本番から削除が必要なファイル', 'distan' ); ?>
+							(<span x-text="manifest.removed.length"></span>)
+						</summary>
+						<p class="hgp-hint">
+							<?php esc_html_e( '前回の納品物に含まれていたファイルです。出力先からは削除済みです。すでにアップロード済みの場合は、本番サーバーから手で削除してください。', 'distan' ); ?>
+						</p>
+						<ul class="hgp-list">
+							<template x-for="f in manifest.removed" :key="f">
+								<li><code x-text="f"></code></li>
+							</template>
+						</ul>
+					</details>
+				</template>
+			</section>
+
+			<!-- Settings -->
+			<section class="hgp-card">
+				<div class="hgp-card__head"><h2><?php esc_html_e( '設定', 'distan' ); ?></h2></div>
+
+				<form method="post" action="options.php">
+					<?php settings_fields( 'distan_settings_group' ); ?>
+					<table class="form-table" role="presentation">
+						<tr>
+							<th scope="row">
+								<label for="distan-site-url"><?php esc_html_e( '公開URL', 'distan' ); ?></label>
+							</th>
+							<td>
+								<input type="url" id="distan-site-url" class="regular-text"
+									name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[site_url]"
+									value="<?php echo esc_attr( (string) $settings['site_url'] ); ?>"
+									placeholder="https://example.com/">
+								<p class="description">
+									<?php esc_html_e( 'canonical と OGP にのみ使います。内部リンクはドキュメント相対で書き出すため、設置場所は選びません。', 'distan' ); ?>
+								</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><?php esc_html_e( 'ファイル名の形式', 'distan' ); ?></th>
+							<td>
+								<fieldset>
+									<label><input type="radio" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[path_style]" value="directory" <?php checked( $settings['path_style'], 'directory' ); ?>> <code>/about/index.html</code></label><br>
+									<label><input type="radio" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[path_style]" value="flat" <?php checked( $settings['path_style'], 'flat' ); ?>> <code>/about.html</code></label>
+								</fieldset>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><?php esc_html_e( '内部リンクの書き方', 'distan' ); ?></th>
+							<td>
+								<fieldset>
+									<label>
+										<input type="radio" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[link_style]" value="relative" <?php checked( $settings['link_style'], 'relative' ); ?>>
+										<?php esc_html_e( 'ドキュメント相対', 'distan' ); ?>
+										<code>../about/index.html</code>
+									</label>
+									<p class="description">
+										<?php esc_html_e( '納品向け。ZIPを解凍してそのまま開けます。設置場所も選びません。', 'distan' ); ?>
+									</p>
+									<label>
+										<input type="radio" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[link_style]" value="absolute" <?php checked( $settings['link_style'], 'absolute' ); ?>>
+										<?php esc_html_e( '公開URLで絶対指定', 'distan' ); ?>
+										<code>https://example.com/about/index.html</code>
+									</label>
+									<p class="description">
+										<?php esc_html_e( 'バックアップ向け。障害時にサーバーのドキュメントルートへ置けば、階層を気にせずそのまま表示できます。公開URLの設定が必要です。', 'distan' ); ?>
+									</p>
+								</fieldset>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><?php esc_html_e( '検索エンジンの扱い', 'distan' ); ?></th>
+							<td>
+								<fieldset>
+									<label>
+										<input type="radio" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[strip_noindex]" value="1" <?php checked( ! empty( $settings['strip_noindex'] ) ); ?>>
+										<?php esc_html_e( 'noindex を除去する（本番納品）', 'distan' ); ?>
+									</label>
+									<p class="description">
+										<?php esc_html_e( '開発環境の「検索エンジンでの表示を許可しない」設定が納品物に焼き込まれるのを防ぎます。通常はこちら。', 'distan' ); ?>
+									</p>
+									<label>
+										<input type="radio" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[strip_noindex]" value="0" <?php checked( empty( $settings['strip_noindex'] ) ); ?>>
+										<?php esc_html_e( 'noindex を残す（テスト環境での確認）', 'distan' ); ?>
+									</label>
+									<p class="description">
+										<?php esc_html_e( '公開前にテスト環境で見せる場合など、検索に拾われたくないときに使います。', 'distan' ); ?>
+									</p>
+								</fieldset>
+								<?php if ( empty( $settings['strip_noindex'] ) ) : ?>
+									<div class="hgp-inline-warn">
+										<?php esc_html_e( '⚠ この設定のまま本番用に生成すると、noindex が残り本番が検索結果に表示されなくなります。納品前に「除去する」へ戻してください。', 'distan' ); ?>
+									</div>
+								<?php endif; ?>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><?php esc_html_e( 'WordPress の痕跡を除く', 'distan' ); ?></th>
+							<td>
+								<label>
+									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[clean_html]" value="1" <?php checked( ! empty( $settings['clean_html'] ) ); ?>>
+									<?php esc_html_e( '納品用にHTMLを整える', 'distan' ); ?>
+								</label>
+								<p class="description">
+									<?php esc_html_e( 'generator、RSD/WLW、REST API、oEmbed、絵文字、ショートリンク、投機的読み込みを書き出しません。開発環境の noindex も常に除去します。', 'distan' ); ?>
+								</p>
+							</td>
+						</tr>
+					</table>
+					<?php submit_button( __( '設定を保存', 'distan' ) ); ?>
+				</form>
+			</section>
+		</div>
+		<?php
+	}
+}
