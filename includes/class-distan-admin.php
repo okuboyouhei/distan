@@ -149,10 +149,6 @@ class Distan_Admin {
 		$out['strip_noindex'] = ! empty( $input['strip_noindex'] );
 		$out['keep_indent'] = isset( $input['keep_indent'] ) ? ! empty( $input['keep_indent'] ) : true;
 
-		// Output dir is not editable from the form yet; preserve what exists.
-		$existing          = Distan::settings();
-		$out['output_dir'] = (string) $existing['output_dir'];
-
 		return $out;
 	}
 

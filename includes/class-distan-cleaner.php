@@ -251,9 +251,25 @@ class Distan_Cleaner {
 
 	/**
 	 * Pass 2 — start buffering so the final HTML can be post-processed.
+	 *
+	 * Only ever runs on Distan's own render request (gated by
+	 * is_render_request() in boot()), never for a normal visitor. The buffer
+	 * is closed explicitly on shutdown so it is never left open for other
+	 * code to trip over.
 	 */
 	public static function start_buffer(): void {
 		ob_start( array( __CLASS__, 'filter_buffer' ) );
+		add_action( 'shutdown', array( __CLASS__, 'close_buffer' ), 0 );
+	}
+
+	/**
+	 * Close our buffer, if it is still the active one, before shutdown
+	 * handlers run. Guards against leaving the buffer stack misaligned.
+	 */
+	public static function close_buffer(): void {
+		if ( ob_get_level() > 0 ) {
+			ob_end_flush();
+		}
 	}
 
 	/**

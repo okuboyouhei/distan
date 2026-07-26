@@ -105,18 +105,36 @@ class Distan_Urls {
 	}
 
 	/**
-	 * Uploads base directory, relative to ABSPATH.
+	 * Uploads base directory as it appears in URLs, relative to the site root.
+	 *
+	 * Derived from the uploads base URL rather than the filesystem path, so it
+	 * holds even when uploads live outside ABSPATH (a custom UPLOADS location,
+	 * a CDN offload rewriting URLs, etc.). Used only to recognise and remap
+	 * upload URLs in generated HTML — never for writing to disk.
 	 */
 	public static function uploads_dir(): string {
-		$uploads = wp_get_upload_dir();
-		$root    = Distan_Paths::normalize( untrailingslashit( ABSPATH ) );
-		$base    = Distan_Paths::normalize( (string) ( $uploads['basedir'] ?? '' ) );
+		$uploads  = wp_get_upload_dir();
+		$base_url = isset( $uploads['baseurl'] ) ? (string) $uploads['baseurl'] : '';
+		$home     = home_url();
 
-		if ( '' === $base || ! str_starts_with( $base, $root . '/' ) ) {
-			return 'wp-content/uploads';
+		// Prefer the path portion of the uploads URL relative to home.
+		if ( '' !== $base_url ) {
+			$base_path = (string) wp_parse_url( $base_url, PHP_URL_PATH );
+			$home_path = (string) wp_parse_url( $home, PHP_URL_PATH );
+
+			if ( '' !== $base_path ) {
+				$relative = $base_path;
+				if ( '' !== $home_path && str_starts_with( $base_path, $home_path ) ) {
+					$relative = substr( $base_path, strlen( $home_path ) );
+				}
+				$relative = trim( $relative, '/' );
+				if ( '' !== $relative ) {
+					return $relative;
+				}
+			}
 		}
 
-		return ltrim( substr( $base, strlen( $root ) ), '/' );
+		return 'wp-content/uploads';
 	}
 
 	/**

@@ -21,19 +21,12 @@ class Distan_Paths {
 	/**
 	 * Absolute path to the output root.
 	 *
-	 * Defaults to uploads/distan/dist so that it is writable on every
-	 * host without extra configuration.
+	 * Always inside the uploads directory, resolved at runtime with
+	 * wp_get_upload_dir(). This is fixed on purpose: WordPress plugins may
+	 * only write under uploads, and locking the root here guarantees nothing
+	 * — settings, filters, or otherwise — can redirect writes elsewhere.
 	 */
 	public static function output_root(): string {
-		$settings = Distan::settings();
-
-		if ( ! empty( $settings['output_dir'] ) ) {
-			$custom = self::normalize( (string) $settings['output_dir'] );
-			if ( '' !== $custom ) {
-				return $custom;
-			}
-		}
-
 		$uploads = wp_get_upload_dir();
 		return self::normalize( trailingslashit( $uploads['basedir'] ) . 'distan/dist' );
 	}
@@ -119,6 +112,14 @@ class Distan_Paths {
 	public static function is_contained( string $absolute, ?string $root = null ): bool {
 		$root = self::normalize( $root ?? self::output_root() );
 
+		// Absolute floor: whatever the root argument is, the target must sit
+		// inside the uploads directory. This cannot be widened by a caller.
+		$uploads = wp_get_upload_dir();
+		$up_base = self::normalize( (string) ( $uploads['basedir'] ?? '' ) );
+		if ( '' === $up_base ) {
+			return false;
+		}
+
 		$real_root = realpath( $root );
 		if ( false === $real_root ) {
 			// The root does not exist yet; nothing can be contained in it.
@@ -146,6 +147,16 @@ class Distan_Paths {
 
 		// The existing ancestor must live inside the root...
 		if ( $real_probe !== $real_root && ! str_starts_with( $real_probe . '/', $real_root . '/' ) ) {
+			return false;
+		}
+
+		// ...the root itself must live inside uploads...
+		$real_uploads = realpath( $up_base );
+		if ( false === $real_uploads ) {
+			return false;
+		}
+		$real_uploads = self::normalize( $real_uploads );
+		if ( $real_root !== $real_uploads && ! str_starts_with( $real_root . '/', $real_uploads . '/' ) ) {
 			return false;
 		}
 
