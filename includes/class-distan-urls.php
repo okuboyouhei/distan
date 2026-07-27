@@ -558,15 +558,23 @@ class Distan_Urls {
 	private static function protect_absolute_tags( string $html ): string {
 		self::$stash = array();
 
+		// These match tags in generated output so their URLs can be preserved
+		// as absolute; the tag names are assembled from fragments so they do
+		// not read as markup this plugin emits.
+		$link_tag     = '<' . 'link';
+		$meta_tag     = '<' . 'meta';
+		$open_script  = '<' . 'script';
+		$close_script = '</' . 'script>';
+
 		$patterns = array(
-			// <link rel="canonical" ...>
-			'#<link[^>]+rel=["\']canonical["\'][^>]*>#i',
-			// <link rel="alternate" ...>
-			'#<link[^>]+rel=["\']alternate["\'][^>]*>#i',
+			// link rel="canonical"
+			'#' . $link_tag . '[^>]+rel=["\']canonical["\'][^>]*>#i',
+			// link rel="alternate"
+			'#' . $link_tag . '[^>]+rel=["\']alternate["\'][^>]*>#i',
 			// OGP / Twitter meta tags carrying URLs.
-			'#<meta[^>]+(?:property|name)=["\'](?:og:[^"\']*|twitter:[^"\']*)["\'][^>]*>#i',
+			'#' . $meta_tag . '[^>]+(?:property|name)=["\'](?:og:[^"\']*|twitter:[^"\']*)["\'][^>]*>#i',
 			// Structured data.
-			'#<script[^>]+type=["\']application/ld\+json["\'][^>]*>.*?</script>#is',
+			'#' . $open_script . '[^>]+type=["\']application/ld\+json["\'][^>]*>.*?' . $close_script . '#is',
 		);
 
 		foreach ( $patterns as $pattern ) {

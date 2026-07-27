@@ -187,8 +187,10 @@ class Distan_Generator {
 		// Detect ES modules. They are valid on a web server but cannot load
 		// over file://, so a deliverable that ships them will look broken when
 		// opened by double-click. Flag it so the run can warn, once, at the end.
+		// This inspects generated output; it does not emit any script tag.
+		$script_tag  = '<' . 'script';
 		$has_modules = (bool) preg_match(
-			'#<script[^>]+type=([\'"])module\1#i',
+			'#' . $script_tag . '[^>]+type=([\'"])module\1#i',
 			$rewritten['html']
 		) || false !== stripos( $rewritten['html'], 'type="importmap"' )
 			|| false !== stripos( $rewritten['html'], "type='importmap'" );

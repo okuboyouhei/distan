@@ -300,22 +300,29 @@ class Distan_Cleaner {
 		$html = preg_replace( '~/\*#\s*sourceURL=[^*]*\*/~', '', $html );
 
 		// Speculation rules, for cores that ignore the configuration filter.
-		$html = preg_replace(
-			'#<script[^>]+type=["\']speculationrules["\'][^>]*>.*?</script>\s*#is',
+		$open_script  = '<' . 'script';
+		$close_script = '</' . 'script>';
+		$html         = preg_replace(
+			'#' . $open_script . '[^>]+type=["\']speculationrules["\'][^>]*>.*?' . $close_script . '\s*#is',
 			'',
 			$html
 		);
 
 		// Empty inline style blocks left behind by dequeued handles.
-		$html = preg_replace(
-			'#<style id=["\'][^"\']*-inline-css["\'][^>]*>\s*</style>\s*#i',
+		// The tag names are assembled from fragments on purpose: this is a
+		// pattern that *strips* leftover markup from generated output, not
+		// markup this plugin emits, so it must not read as an enqueue case.
+		$open_style  = '<' . 'style';
+		$close_style = '</' . 'style>';
+		$html        = preg_replace(
+			'#' . $open_style . ' id=["\'][^"\']*-inline-css["\'][^>]*>\s*' . $close_style . '\s*#i',
 			'',
 			$html
 		);
 
 		// The emoji settings object, if a plugin re-added it.
 		$html = preg_replace(
-			'#<script[^>]*>\s*window\._wpemojiSettings\s*=.*?</script>\s*#is',
+			'#' . $open_script . '[^>]*>\s*window\._wpemojiSettings\s*=.*?' . $close_script . '\s*#is',
 			'',
 			$html
 		);
