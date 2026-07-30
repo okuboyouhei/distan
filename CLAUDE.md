@@ -92,6 +92,10 @@ wp-content/uploads/2026/07/x            →  media/2026/07/x
 
 Distan は構造化データを**生成しません**。テーマや SEO プラグイン（Yoast、AIOSEO など）が出力した JSON-LD を、`protect_absolute_tags()` で保護しつつ静的化時に保持し、内部の URL を本番 URL に置換して運ぶだけです。生成の責任（型の選択、コンテンツとの整合、SSRF 相当のリスク）を負わないのは意図的な設計判断です。非公開・別ドメインの制作環境でも、**置換を前提にする**ことで本番向けの正しい構造化データを書き出せます。
 
+## 生成完了フック（`distan_after_generate`）
+
+全バッチ完了後、マニフェストとレポートを書き出した直後に一度だけ `do_action( 'distan_after_generate', $manifest, $output_root )` を発火する。**Distan はデプロイを行わない**——このフックは git push / rsync / SFTP / Netlify・Cloudflare Pages の Webhook などを繋ぐための seam。プラグインがデプロイ資格情報やホスト固有の知識を持たずに済むよう、意図的に「知らせるだけ」にしている。本番に WordPress を置かない SSG＋自動デプロイ構成の要。
+
 ## Markdown 書き出し（`Distan_Markdown`、選択制）
 
 設定 `export_markdown` が有効なとき、全ページの本文を 1 ファイル `content.md` にまとめて出力ルートに書き出します。NotebookLM 等の AI ツールにサイト内容を読ませる用途です。

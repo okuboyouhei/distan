@@ -277,6 +277,29 @@ Distan は構造化データを**生成しません**。テーマや SEO プラ�
 
 構造化データ内の URL のうち、基本のドメイン置換（`site_url` 設定）で届かないもの（CDN 上のロゴ URL など）は、上記の `distan_url_replacements` で調整できます。制作環境が非公開・別ドメインでも、置換を前提にすることで本番向けの正しい構造化データを書き出せます。
 
+## 自動デプロイ（生成完了フック）
+
+Distan 自体はデプロイを行いません。ファイルを出力ディレクトリに書き出すだけです。ただし、生成が完了したタイミングで発火するアクションフック `distan_after_generate` を用意しています。ここに任意のデプロイ処理（git commit + push、rsync、SFTP 同期、Netlify / Cloudflare Pages のビルド Webhook など）を繋げば、「WordPress で編集 → 静的 HTML 生成 → 自動デプロイ」という流れを、**本番に WordPress を一切置かずに**組めます。デプロイ先を選ばず、Distan が認証情報を持つこともありません。
+
+```php
+/**
+ * @param array  $manifest    files / added / removed / broken / cleaned / has_modules / finished
+ * @param string $output_root 出力ディレクトリの絶対パス（uploads/distan/dist）
+ */
+add_action( 'distan_after_generate', function ( $manifest, $output_root ) {
+    // 例: 出力ディレクトリを git で commit & push（GitHub Pages / Netlify などが自動ビルド）
+    $cmd = sprintf(
+        'cd %s && git add -A && git commit -m "distan: %s" && git push',
+        escapeshellarg( $output_root ),
+        escapeshellarg( gmdate( 'Y-m-d H:i' ) )
+    );
+    // 実行方法は環境に合わせて（WP-Cron、シェル、CI 連携など）。
+    // exec() を使う場合は環境の許可とセキュリティを必ず確認すること。
+}, 10, 2 );
+```
+
+これにより WordPress を「ヘッドレス的」に使えますが、本来のヘッドレス CMS（本番で API サーバーとして動き続ける構成）とは異なり、**本番には静的 HTML しか置きません**。API サーバーすら存在しないぶん、より軽く、より安全です。
+
 ---
 
 ## アンインストール

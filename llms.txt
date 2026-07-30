@@ -23,6 +23,7 @@ Distan は公開中の全ページをループバック HTTP で巡回し、静�
 - 差分レポート・自動掃除・差分 Markdown・ZIP 書き出し
 - Markdown 書き出し（選択制、content.md、NotebookLM 等の AI ツール向け）
 - リンク監査
+- 生成完了フック（distan_after_generate）で自動デプロイに接続（Distan自体はデプロイしない）
 
 ## できないこと
 

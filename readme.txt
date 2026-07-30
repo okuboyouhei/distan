@@ -4,7 +4,7 @@ Tags: static site generator, static, export, html, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.9.15
+Stable tag: 0.9.16
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -64,6 +64,9 @@ Anything that needs server-side processing: search forms, comment submission, co
 Yes, with a classic theme. Block themes load their JavaScript as ES modules, which browsers refuse to load over `file://`. HTML, CSS, images, and links work either way; use a local server for a complete preview.
 
 == Changelog ==
+
+= 0.9.16 =
+* Added the `distan_after_generate` action hook, fired when a generation run completes, for wiring up automatic deployment (git push, rsync, build webhooks, etc.).
 
 = 0.9.15 =
 * Redesigned the admin screen ("Distan Dispatch"): a packing-slip worksheet look with monospace figures for counts and file paths, a single stamp-green accent, and improved contrast.

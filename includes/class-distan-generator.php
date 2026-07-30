@@ -117,6 +117,25 @@ class Distan_Generator {
 				array( 'link_style' => Distan::settings()['link_style'] )
 			);
 
+			/**
+			 * Fires once, after a full generation run has finished and the
+			 * manifest and report are written.
+			 *
+			 * Distan itself does not deploy — it only writes files to the
+			 * output directory. This hook is the seam for wiring up whatever
+			 * deploy step a project uses (git commit + push, rsync, an SFTP
+			 * sync, a Netlify / Cloudflare Pages build webhook, and so on),
+			 * so the plugin never has to hold deploy credentials or know
+			 * about any particular host.
+			 *
+			 * @param array  $manifest    The generation manifest: files, added,
+			 *                             removed, broken, cleaned, has_modules,
+			 *                             finished (timestamp).
+			 * @param string $output_root Absolute path to the output directory
+			 *                             (uploads/distan/dist).
+			 */
+			do_action( 'distan_after_generate', self::manifest(), Distan_Paths::output_root() );
+
 			delete_transient( self::JOB_KEY );
 		} else {
 			set_transient( self::JOB_KEY, $job, HOUR_IN_SECONDS );
