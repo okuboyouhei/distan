@@ -1,16 +1,22 @@
-/* Distan admin */
+/* Distan admin — "Distan Dispatch"
+   A packing-slip worksheet: cool recycled stock, single stamp-green accent,
+   monospace numerals and paths, hairline rules, near-zero radius.
+   See DESIGN.md for the rationale behind every token. */
 
 .distan-wrap {
-	--hgp-primary: #2E4A62;
-	--hgp-primary-dark: #1F3346;
-	--hgp-line: #DCE3EA;
-	--hgp-tint: #F2F5F8;
-	--hgp-muted: #6E7681;
-	--hgp-ok: #1E7E34;
-	--hgp-warn: #B26A00;
-	--hgp-warn-tint: #FCF6EC;
-	--hgp-danger: #B3400F;
-	--hgp-danger-tint: #FBF0EC;
+	--dsp-ink: #1A1D21;
+	--dsp-slate: #4B535E;
+	--dsp-line: #DDE1E6;
+	--dsp-panel: #FFFFFF;
+	--dsp-ground: #F3F1EC;
+	--dsp-stamp: #15544A;
+	--dsp-stamp-dark: #0E3E37;
+	--dsp-ok: #15654A;
+	--dsp-warn: #8A5A00;
+	--dsp-warn-tint: #F6F1E6;
+	--dsp-danger: #9E3319;
+	--dsp-danger-tint: #F6ECE8;
+	--dsp-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
 	max-width: 1000px;
 	/* WP positions #wpfooter absolutely; keep clear of it as sections grow. */
@@ -21,24 +27,24 @@
 
 .distan-tagline {
 	margin: -4px 0 0;
-	color: var(--hgp-muted);
-	font-size: 12px;
-	letter-spacing: .04em;
+	color: var(--dsp-slate);
+	font-size: 11px;
+	letter-spacing: .08em;
 	text-transform: uppercase;
 }
 
 .distan-lede {
 	max-width: 62ch;
 	margin: 14px 0 26px;
-	color: #3C434A;
+	color: var(--dsp-slate);
 }
 
-/* Cards ------------------------------------------------------------- */
+/* Cards — worksheets ------------------------------------------------ */
 
 .hgp-card {
-	background: #fff;
-	border: 1px solid var(--hgp-line);
-	border-radius: 6px;
+	background: var(--dsp-panel);
+	border: 1px solid var(--dsp-line);
+	border-radius: 2px;
 	padding: 4px 24px 24px;
 	margin-bottom: 20px;
 }
@@ -50,15 +56,15 @@
 	gap: 16px;
 	flex-wrap: wrap;
 	padding: 16px 0;
-	border-bottom: 1px solid var(--hgp-line);
+	border-bottom: 1px solid var(--dsp-line);
 	margin-bottom: 20px;
 }
 
 .hgp-card__head h2 {
 	margin: 0;
-	font-size: 15px;
+	font-size: 13px;
 	font-weight: 600;
-	color: var(--hgp-primary-dark);
+	color: var(--dsp-ink);
 	letter-spacing: .02em;
 }
 
@@ -68,31 +74,37 @@
 	gap: 14px;
 }
 
+/* Primary action = the inked stamp */
 .distan-wrap .button-primary {
-	background: var(--hgp-primary);
-	border-color: var(--hgp-primary-dark);
+	background: var(--dsp-stamp);
+	border-color: var(--dsp-stamp-dark);
+	box-shadow: none;
+	text-shadow: none;
 }
 
 .distan-wrap .button-primary:hover,
 .distan-wrap .button-primary:focus {
-	background: var(--hgp-primary-dark);
-	border-color: var(--hgp-primary-dark);
+	background: var(--dsp-stamp-dark);
+	border-color: var(--dsp-stamp-dark);
 }
 
 .hgp-batch {
-	color: var(--hgp-muted);
+	color: var(--dsp-slate);
 	font-size: 12px;
 	white-space: nowrap;
 }
 
-.hgp-batch input { width: 60px; }
+.hgp-batch input {
+	width: 60px;
+	font-family: var(--dsp-mono);
+}
 
 .hgp-empty {
 	margin: 0;
-	color: var(--hgp-muted);
+	color: var(--dsp-slate);
 }
 
-/* Tables ------------------------------------------------------------ */
+/* Tables — itemised rows -------------------------------------------- */
 
 .hgp-table {
 	width: 100%;
@@ -104,7 +116,7 @@
 	padding: 9px 12px 9px 0;
 	text-align: left;
 	vertical-align: top;
-	border-bottom: 1px solid var(--hgp-tint);
+	border-bottom: 1px solid var(--dsp-line);
 	font-weight: 400;
 }
 
@@ -114,7 +126,7 @@
 .hgp-table th[scope="row"] {
 	width: 12em;
 	font-weight: 600;
-	color: #1d2327;
+	color: var(--dsp-ink);
 }
 
 .hgp-table__status { width: 56px; }
@@ -122,101 +134,110 @@
 .hgp-table--pairs td { font-size: 12px; }
 .hgp-table--pairs td:first-child { width: 40%; }
 
+/* File paths and counts are manifest data → monospace */
 .hgp-detail {
 	background: none;
 	padding: 0;
+	font-family: var(--dsp-mono);
 	font-size: 12px;
-	color: #3C434A;
+	color: var(--dsp-ink);
 	word-break: break-all;
 }
 
 .hgp-hint {
 	margin: 6px 0 0;
-	color: var(--hgp-muted);
+	color: var(--dsp-slate);
 	font-size: 12px;
 	max-width: 68ch;
 }
 
+/* Status badges — ink stamps, not fills */
 .hgp-badge {
 	display: inline-block;
 	min-width: 38px;
 	padding: 2px 7px;
-	border-radius: 3px;
+	border-radius: 2px;
+	font-family: var(--dsp-mono);
 	font-size: 11px;
 	font-weight: 700;
+	letter-spacing: .04em;
 	text-align: center;
 	color: #fff;
 }
 
-.hgp-badge.is-ok { background: var(--hgp-ok); }
-.hgp-badge.is-warning { background: var(--hgp-warn); }
-.hgp-badge.is-error { background: var(--hgp-danger); }
+.hgp-badge.is-ok { background: var(--dsp-ok); }
+.hgp-badge.is-warning { background: var(--dsp-warn); }
+.hgp-badge.is-error { background: var(--dsp-danger); }
 
-/* Progress ---------------------------------------------------------- */
+/* Progress — a tally advancing ------------------------------------- */
 
 .hgp-progress { max-width: 520px; margin-bottom: 22px; }
 
 .hgp-bar {
 	height: 6px;
-	background: var(--hgp-tint);
-	border-radius: 3px;
+	background: var(--dsp-ground);
+	border: 1px solid var(--dsp-line);
+	border-radius: 2px;
 	overflow: hidden;
 }
 
 .hgp-bar__fill {
 	height: 100%;
-	background: var(--hgp-primary);
+	background: var(--dsp-stamp);
 	transition: width .18s ease-out;
 }
 
 .hgp-progress__label {
 	margin: 8px 0 0;
+	font-family: var(--dsp-mono);
 	font-size: 12px;
-	color: var(--hgp-muted);
+	color: var(--dsp-slate);
 	font-variant-numeric: tabular-nums;
 }
 
-/* Stats ------------------------------------------------------------- */
+/* Stats — quantity boxes on the slip -------------------------------- */
 
 .hgp-stats {
 	display: grid;
 	grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
 	gap: 1px;
-	background: var(--hgp-line);
-	border: 1px solid var(--hgp-line);
-	border-radius: 4px;
+	background: var(--dsp-line);
+	border: 1px solid var(--dsp-line);
+	border-radius: 2px;
 	overflow: hidden;
 	margin-bottom: 18px;
 }
 
 .hgp-stat {
-	background: #fff;
+	background: var(--dsp-panel);
 	padding: 14px 16px;
 }
 
 .hgp-stat__num {
 	display: block;
-	font-size: 26px;
+	font-family: var(--dsp-mono);
+	font-size: 27px;
 	line-height: 1.1;
-	font-weight: 300;
-	color: var(--hgp-primary-dark);
+	font-weight: 400;
+	color: var(--dsp-ink);
 	font-variant-numeric: tabular-nums;
 }
 
-.hgp-stat.is-warn .hgp-stat__num { color: var(--hgp-warn); }
+.hgp-stat.is-warn .hgp-stat__num { color: var(--dsp-warn); }
 
 .hgp-stat__label {
 	display: block;
-	margin-top: 4px;
+	margin-top: 6px;
 	font-size: 11px;
-	color: var(--hgp-muted);
+	letter-spacing: .06em;
+	color: var(--dsp-slate);
 }
 
-/* Disclosures ------------------------------------------------------- */
+/* Disclosures — attention rows -------------------------------------- */
 
 .hgp-details {
-	border: 1px solid var(--hgp-line);
-	border-radius: 4px;
+	border: 1px solid var(--dsp-line);
+	border-radius: 2px;
 	padding: 0 16px;
 	margin-bottom: 12px;
 }
@@ -228,13 +249,13 @@
 	padding: 11px 0;
 	font-weight: 600;
 	font-size: 13px;
-	color: #1d2327;
+	color: var(--dsp-ink);
 }
 
-.hgp-details > summary:focus-visible { outline: 2px solid var(--hgp-primary); }
+.hgp-details > summary:focus-visible { outline: 2px solid var(--dsp-stamp); }
 
-.hgp-details.is-warn { border-left: 3px solid var(--hgp-warn); background: var(--hgp-warn-tint); }
-.hgp-details.is-error { border-left: 3px solid var(--hgp-danger); background: var(--hgp-danger-tint); }
+.hgp-details.is-warn { border-left: 3px solid var(--dsp-warn); background: var(--dsp-warn-tint); }
+.hgp-details.is-error { border-left: 3px solid var(--dsp-danger); background: var(--dsp-danger-tint); }
 
 .hgp-list {
 	margin: 8px 0 0;
@@ -243,6 +264,8 @@
 	max-height: 260px;
 	overflow-y: auto;
 }
+/* File paths inside list items stay monospace for alignment */
+.hgp-list code, .hgp-list .path { font-family: var(--dsp-mono); }
 
 .hgp-list li { margin: 0 0 3px; }
 
@@ -250,15 +273,15 @@
 
 .hgp-alert {
 	padding: 10px 14px;
-	border-radius: 4px;
+	border-radius: 2px;
 	margin-bottom: 16px;
 	font-size: 13px;
 }
 
 .hgp-alert.is-error {
-	background: var(--hgp-danger-tint);
-	border-left: 3px solid var(--hgp-danger);
-	color: #6b2609;
+	background: var(--dsp-danger-tint);
+	border-left: 3px solid var(--dsp-danger);
+	color: #6b2412;
 }
 
 /* Settings form ----------------------------------------------------- */
@@ -270,12 +293,14 @@
 	.hgp-bar__fill { transition: none; }
 }
 
+/* Code / commands — printed onto the slip */
 .hgp-code {
 	margin: 4px 0 12px;
 	padding: 8px 12px;
-	background: #1F3346;
-	color: #E8EDF2;
-	border-radius: 3px;
+	background: var(--dsp-ink);
+	color: #EDEBE4;
+	border-radius: 2px;
+	font-family: var(--dsp-mono);
 	font-size: 12px;
 	overflow-x: auto;
 }
@@ -283,11 +308,11 @@
 .hgp-inline-warn {
 	margin-top: 10px;
 	padding: 8px 12px;
-	background: var(--hgp-warn-tint);
-	border-left: 3px solid var(--hgp-warn);
-	border-radius: 0 3px 3px 0;
+	background: var(--dsp-warn-tint);
+	border-left: 3px solid var(--dsp-warn);
+	border-radius: 0 2px 2px 0;
 	font-size: 12px;
-	color: #6b4200;
+	color: #6b4400;
 	max-width: 62ch;
 }
 

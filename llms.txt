@@ -9,6 +9,7 @@ Distan は公開中の全ページをループバック HTTP で巡回し、静�
 - [README.md](README.md): 人間向けの機能説明・使い方・フィルタ一覧
 - [ai-reference.md](ai-reference.md): AI 向けの「できること／できないこと」リファレンス
 - [CLAUDE.md](CLAUDE.md): コードを編集する開発者・AI 向けの設計ドキュメント
+- [DESIGN.md](DESIGN.md): 管理画面のビジュアルデザイン仕様（Google の design.md 形式）
 - [TESTING.md](TESTING.md): 変更後の検証手順
 
 ## 主な機能
