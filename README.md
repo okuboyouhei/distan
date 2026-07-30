@@ -221,6 +221,23 @@ WordPress で運用中のサイトの「保険」としても使えます。
 
 ---
 
+## Markdown 書き出し（AI ツール向け）
+
+設定で「Markdown を書き出す」を有効にすると、全ページの本文を 1 つの Markdown ファイル（`content.md`）にまとめて、出力先に書き出します。NotebookLM などの AI ツールにサイト全体を読み込ませ、内容を自然言語で질問する用途を想定しています。
+
+- ヘッダー・ナビゲーション・フッター・サイドバー・フォームは除き、`<main>`（無ければ `<article>` や本文コンテナ）の**本文だけ**を抽出します。ページごとに見出しと URL を付けて連結します。
+- 静的 HTML の生成と同じ巡回で本文を取得するため、追加のクロールは発生しません。
+- サイトを更新したら再生成すると `content.md` も新しくなります。NotebookLM 側では、ソースを新しい `content.md` に差し替えて使います（サイト更新のたびに手動で入れ直す運用）。
+- 本文の抽出範囲は `distan_markdown_region` フィルタで調整できます。
+- 書き出される URL は公開 URL（サイト URL 設定）に置換されます。開発・データ管理用に、置換していない版（`content.local.md`）も出力できます（設定で選択）。
+
+```php
+// Markdown 抽出前に、本文領域から特定の要素を除くなど
+add_filter( 'distan_markdown_region', function ( $html ) {
+    return preg_replace( '#<div class="ad-banner">.*?</div>#is', '', $html );
+} );
+```
+
 ## フィルタ
 
 ```php
@@ -237,11 +254,28 @@ add_filter( 'distan_collect', function ( $items ) {
 
 // global-styles のインライン CSS を除去する
 add_filter( 'distan_remove_global_styles', '__return_true' );
+
+// 本番 URL への追加の置換ルール（定義順に適用。長い・具体的なものを先に）
+// site_url による基本のドメイン置換のあと、生成物全体（本文・JSON-LD・
+// canonical・OGP を含む）に適用されます。CDN 配信のアセットや、制作環境
+// 特有のパスなど、基本置換で届かない箇所の調整に。
+add_filter( 'distan_url_replacements', function ( $pairs ) {
+    return array(
+        'https://dev.example.com/wp-content/uploads/' => 'https://cdn.example.com/',
+        'https://dev.example.com/staging-only/'       => 'https://example.com/',
+    );
+} );
 ```
 
 利用できるフィルタ:
 
-`distan_capability` `distan_collect` `distan_post_types` `distan_taxonomies` `distan_archive_max_pages` `distan_term_max_pages` `distan_404_probe` `distan_head_actions` `distan_dequeue_handles` `distan_remove_global_styles` `distan_robots` `distan_clean_html` `distan_flatten_theme` `distan_uploads_dir` `distan_blocked_extensions` `distan_clean_output`
+`distan_capability` `distan_collect` `distan_post_types` `distan_taxonomies` `distan_archive_max_pages` `distan_term_max_pages` `distan_404_probe` `distan_head_actions` `distan_dequeue_handles` `distan_remove_global_styles` `distan_robots` `distan_clean_html` `distan_flatten_theme` `distan_uploads_dir` `distan_blocked_extensions` `distan_clean_output` `distan_url_replacements`
+
+### 構造化データ（JSON-LD）について
+
+Distan は構造化データを**生成しません**。テーマや SEO プラグイン（Yoast SEO、AIOSEO など）が出力した JSON-LD を、静的化時にそのまま保持し、内部の URL を本番 URL に置換します。構造化データを入れたい場合は、これらのプラグインで設定してください。Distan はそれを壊さず、本番向けの URL に直して書き出します。
+
+構造化データ内の URL のうち、基本のドメイン置換（`site_url` 設定）で届かないもの（CDN 上のロゴ URL など）は、上記の `distan_url_replacements` で調整できます。制作環境が非公開・別ドメインでも、置換を前提にすることで本番向けの正しい構造化データを書き出せます。
 
 ---
 

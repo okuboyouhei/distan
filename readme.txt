@@ -4,7 +4,7 @@ Tags: static site generator, static, export, html, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.9.13
+Stable tag: 0.9.14
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -64,6 +64,10 @@ Anything that needs server-side processing: search forms, comment submission, co
 Yes, with a classic theme. Block themes load their JavaScript as ES modules, which browsers refuse to load over `file://`. HTML, CSS, images, and links work either way; use a local server for a complete preview.
 
 == Changelog ==
+
+= 0.9.14 =
+* Added the `distan_url_replacements` filter for custom production URL replacements (applied across the whole output, including JSON-LD).
+* Added an optional Markdown export (content.md) that combines every page's main content into one file for AI tools such as NotebookLM. URLs are rewritten to the production site URL; an optional content.local.md keeps development URLs.
 
 = 0.9.13 =
 * Initial public release.

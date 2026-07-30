@@ -351,10 +351,66 @@ class Distan_Urls {
 
 		$html = self::restore_absolute_tags( $html );
 
+		// Apply user-defined replacement pairs last, across the whole document
+		// (body URLs, JSON-LD, everything). This runs after the site_url swap
+		// so custom rules can target the already-production URLs, and it is
+		// applied in definition order so callers can put longer, more specific
+		// patterns first.
+		$html = self::apply_custom_replacements( $html );
+
 		return array(
 			'html'   => $html,
 			'assets' => self::$asset_queue,
 		);
+	}
+
+	/**
+	 * User-defined replacement pairs, applied in definition order.
+	 *
+	 * Filter `distan_url_replacements` returns an associative array of
+	 * search => replace pairs. Intended for production URL adjustments the
+	 * base site_url swap does not cover — CDN-hosted assets, staging-only
+	 * paths, logo/OG image URLs in structured data, and so on. Kept in code
+	 * (not the admin UI) on purpose, so the rules live in version control and
+	 * travel with the project.
+	 *
+	 * @return array<string, string>
+	 */
+	private static function custom_replacements(): array {
+		$pairs = apply_filters( 'distan_url_replacements', array() );
+
+		if ( ! is_array( $pairs ) ) {
+			return array();
+		}
+
+		$clean = array();
+
+		foreach ( $pairs as $from => $to ) {
+			// Keys must be non-empty strings; values must be strings.
+			if ( ! is_string( $from ) || '' === $from || ! is_string( $to ) ) {
+				continue;
+			}
+			$clean[ $from ] = $to;
+		}
+
+		return $clean;
+	}
+
+	/**
+	 * Run the custom replacement pairs over a blob of text.
+	 *
+	 * Definition order is preserved (PHP associative arrays are ordered), so
+	 * a caller listing a longer pattern before a shorter overlapping one gets
+	 * the longer match applied first.
+	 */
+	private static function apply_custom_replacements( string $text ): string {
+		$pairs = self::custom_replacements();
+
+		if ( empty( $pairs ) ) {
+			return $text;
+		}
+
+		return str_replace( array_keys( $pairs ), array_values( $pairs ), $text );
 	}
 
 	/**
@@ -595,6 +651,29 @@ class Distan_Urls {
 	/**
 	 * Swap the development origin for the production URL inside a stashed tag.
 	 */
+	/**
+	 * Convert development URLs to production URLs in an arbitrary blob of text.
+	 *
+	 * Applies the same two-stage swap used for HTML output — the site_url
+	 * domain swap, then the user-defined `distan_url_replacements` pairs — but
+	 * for plain text such as the Markdown export. Returns the text unchanged
+	 * when no site_url is configured (nothing to swap to).
+	 */
+	public static function to_public_urls( string $text ): string {
+		$settings = Distan::settings();
+		$site     = trim( (string) $settings['site_url'] );
+
+		if ( '' !== $site ) {
+			$text = str_replace(
+				array( trailingslashit( home_url( '/' ) ), self::home_base() ),
+				array( trailingslashit( $site ), untrailingslashit( $site ) ),
+				$text
+			);
+		}
+
+		return self::apply_custom_replacements( $text );
+	}
+
 	private static function absolutize( string $fragment ): string {
 		$settings = Distan::settings();
 		$site     = trim( (string) $settings['site_url'] );

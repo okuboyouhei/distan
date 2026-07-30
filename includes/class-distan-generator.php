@@ -40,13 +40,14 @@ class Distan_Generator {
 		$queue = Distan_Collector::collect();
 
 		$job = array(
-			'queue'     => $queue,
-			'index'     => 0,
-			'total'     => count( $queue ),
-			'written'   => array(),
-			'assets'    => array(),
-			'errors'    => array(),
-			'started'   => time(),
+			'queue'       => $queue,
+			'index'       => 0,
+			'total'       => count( $queue ),
+			'written'     => array(),
+			'assets'      => array(),
+			'errors'      => array(),
+			'md_sections' => array(),
+			'started'     => time(),
 		);
 
 		set_transient( self::JOB_KEY, $job, HOUR_IN_SECONDS );
@@ -92,6 +93,10 @@ class Distan_Generator {
 			if ( ! empty( $result['has_modules'] ) ) {
 				$job['has_modules'] = true;
 			}
+
+			if ( ! empty( $result['md_section'] ) ) {
+				$job['md_sections'][] = $result['md_section'];
+			}
 		}
 
 		$done = $job['index'] >= $job['total'];
@@ -100,6 +105,11 @@ class Distan_Generator {
 			$job['assets_copied'] = self::copy_assets( $job['assets'] );
 			$job['broken']        = self::audit_links( $job['written'] );
 			$job['cleaned']       = self::clean_output( $job );
+
+			if ( Distan_Markdown::is_enabled() && ! empty( $job['md_sections'] ) ) {
+				$job['md_written'] = Distan_Markdown::write( $job['md_sections'] );
+			}
+
 			self::write_manifest( $job );
 
 			Distan_Report::save(
@@ -195,9 +205,15 @@ class Distan_Generator {
 		) || false !== stripos( $rewritten['html'], 'type="importmap"' )
 			|| false !== stripos( $rewritten['html'], "type='importmap'" );
 
+		$section = null;
+		if ( ! $is_404 && Distan_Markdown::is_enabled() ) {
+			$section = Distan_Markdown::extract( $html, $item );
+		}
+
 		return array(
 			'assets'      => $rewritten['assets'],
 			'has_modules' => $has_modules,
+			'md_section'  => $section,
 		);
 	}
 

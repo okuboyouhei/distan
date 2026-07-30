@@ -51,6 +51,7 @@ WordPress を制作環境として使い、納品できる静的 HTML を書き�
 | `Distan_Collector` | 生成対象の列挙 |
 | `Distan_Generator` | 生成・アセットコピー・掃除・リンク監査・マニフェスト |
 | `Distan_Report` | 差分 Markdown と ZIP |
+| `Distan_Markdown` | AI ツール向けの本文抽出と `content.md` 生成（選択制） |
 | `Distan_Admin` | 管理画面とダウンロード配信 |
 | `Distan_Ajax` | AJAX エンドポイント |
 
@@ -84,6 +85,23 @@ wp-content/uploads/2026/07/x            →  media/2026/07/x
 ```
 
 平坦化すると出力パスから元ファイルを復元できなくなるため、`Distan_Urls::source_for()` が逆引きを行います。平坦化の規則を変えたら、逆引きも必ず対応させてください。
+
+**本番 URL への置換**は 2 段階です。まず `site_url` 設定による基本のドメイン置換、次に `distan_url_replacements` フィルタで定義された追加ペア（定義順に適用）。後者は `rewrite()` の最後で生成物全体に対して実行されるため、本文・JSON-LD・canonical・OGP のすべてに効きます。CDN 上のアセットや制作環境特有のパスなど、基本置換で届かない箇所の調整用です。
+
+## 構造化データ（JSON-LD）の扱い
+
+Distan は構造化データを**生成しません**。テーマや SEO プラグイン（Yoast、AIOSEO など）が出力した JSON-LD を、`protect_absolute_tags()` で保護しつつ静的化時に保持し、内部の URL を本番 URL に置換して運ぶだけです。生成の責任（型の選択、コンテンツとの整合、SSRF 相当のリスク）を負わないのは意図的な設計判断です。非公開・別ドメインの制作環境でも、**置換を前提にする**ことで本番向けの正しい構造化データを書き出せます。
+
+## Markdown 書き出し（`Distan_Markdown`、選択制）
+
+設定 `export_markdown` が有効なとき、全ページの本文を 1 ファイル `content.md` にまとめて出力ルートに書き出します。NotebookLM 等の AI ツールにサイト内容を読ませる用途です。
+
+- 静的 HTML 生成と**同じ巡回**（`render_one` が回収した HTML）から抽出するため、追加のクロールは発生しません
+- `<main>` → `<article>` → 本文コンテナ → `<body>` の優先順で本文領域を絞り、header/nav/footer/aside/form/script/style を除去します
+- **アーカイブのページネーション（`/page/N/`）は除外**します（個別ページで取得済みの抜粋が重複するため）
+- 依存ライブラリを持たない軽量な HTML→Markdown 変換（見出し・段落・リスト・リンクのみ）
+- `clean_output()` の後に書き出すため、再生成のたびに `content.md` は最新化され、機能を無効化すると次回掃除で消えます
+- 抽出範囲は `distan_markdown_region` フィルタで調整可能
 
 ## リリース手順
 

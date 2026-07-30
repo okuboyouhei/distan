@@ -3,7 +3,7 @@
  * Plugin Name: Distan
  * Plugin URI:  https://github.com/okuboyouhei/distan
  * Description: dist で開発する、WordPress静的サイトジェネレーター。HTML納品案件のために、WordPressを制作環境として使い、余計なものを含まない静的HTMLを書き出します。
- * Version:     0.9.13
+ * Version:     0.9.14
  * Author:      Youhei Okubo
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'DISTAN_VERSION', '0.9.13' );
+define( 'DISTAN_VERSION', '0.9.14' );
 define( 'DISTAN_FILE', __FILE__ );
 define( 'DISTAN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DISTAN_URL', plugin_dir_url( __FILE__ ) );
@@ -28,6 +28,7 @@ require_once DISTAN_DIR . 'includes/class-distan-urls.php';
 require_once DISTAN_DIR . 'includes/class-distan-collector.php';
 require_once DISTAN_DIR . 'includes/class-distan-generator.php';
 require_once DISTAN_DIR . 'includes/class-distan-report.php';
+require_once DISTAN_DIR . 'includes/class-distan-markdown.php';
 require_once DISTAN_DIR . 'includes/class-distan-admin.php';
 require_once DISTAN_DIR . 'includes/class-distan-ajax.php';
 
@@ -110,6 +111,8 @@ final class Distan {
 			'clean_html'    => true,
 			'strip_noindex' => true,   // false keeps robots noindex (staging preview).
 			'keep_indent'   => true,
+			'export_markdown' => false, // Write a combined content.md for AI tools (NotebookLM etc.).
+			'export_markdown_local' => false, // Also write content.local.md keeping development URLs.
 		);
 	}
 

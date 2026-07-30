@@ -148,6 +148,8 @@ class Distan_Admin {
 		$out['clean_html']    = ! empty( $input['clean_html'] );
 		$out['strip_noindex'] = ! empty( $input['strip_noindex'] );
 		$out['keep_indent'] = isset( $input['keep_indent'] ) ? ! empty( $input['keep_indent'] ) : true;
+		$out['export_markdown'] = ! empty( $input['export_markdown'] );
+		$out['export_markdown_local'] = ! empty( $input['export_markdown_local'] );
 
 		return $out;
 	}
@@ -517,6 +519,25 @@ class Distan_Admin {
 								</label>
 								<p class="description">
 									<?php esc_html_e( 'generator、RSD/WLW、REST API、oEmbed、絵文字、ショートリンク、投機的読み込みを書き出しません。開発環境の noindex も常に除去します。', 'distan' ); ?>
+								</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><?php esc_html_e( 'Markdown を書き出す', 'distan' ); ?></th>
+							<td>
+								<label>
+									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[export_markdown]" value="1" <?php checked( ! empty( $settings['export_markdown'] ) ); ?>>
+									<?php esc_html_e( 'サイト全体を content.md にまとめる', 'distan' ); ?>
+								</label>
+								<p class="description">
+									<?php esc_html_e( '全ページの本文を1つの Markdown ファイル（content.md）にまとめて書き出します。NotebookLM などの AI ツールにサイト内容を読み込ませる用途に。ヘッダー・フッター・ナビは除き、本文だけを抽出します。URL は公開URL（サイトURL設定）に置換されます。', 'distan' ); ?>
+								</p>
+								<label style="display:block;margin-top:.5em">
+									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[export_markdown_local]" value="1" <?php checked( ! empty( $settings['export_markdown_local'] ) ); ?>>
+									<?php esc_html_e( '制作環境URLのままの版（content.local.md）も書き出す', 'distan' ); ?>
+								</label>
+								<p class="description">
+									<?php esc_html_e( '開発・データ管理用に、URL を置換していない版も出力します。納品物には通常不要です。', 'distan' ); ?>
 								</p>
 							</td>
 						</tr>
