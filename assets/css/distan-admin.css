@@ -62,10 +62,10 @@
 
 .hgp-card__head h2 {
 	margin: 0;
-	font-size: 13px;
+	font-size: 17px;
 	font-weight: 600;
 	color: var(--dsp-ink);
-	letter-spacing: .02em;
+	letter-spacing: .01em;
 }
 
 .hgp-card__actions {
@@ -322,4 +322,116 @@
 	align-items: center;
 	flex-wrap: wrap;
 	margin-bottom: 18px;
+}
+
+/* Dispatch — the manual "デプロイ" gate. A packing-slip footer: one action,
+   two monospace facts (last generated / last dispatched). No state stored. */
+.hgp-dispatch {
+	margin-top: 6px;
+	padding-top: 16px;
+	border-top: 1px solid var(--dsp-rule, #E3DFD6);
+}
+
+.hgp-dispatch__action {
+	display: block;
+}
+
+.hgp-dispatch__action .button-primary {
+	margin-bottom: 10px;
+}
+
+.hgp-dispatch__action .hgp-hint {
+	margin: 0;
+	max-width: 62ch;
+}
+
+.hgp-dispatch__error {
+	margin-top: 10px;
+}
+
+.hgp-shipmeta {
+	margin: 14px 0 0;
+	display: flex;
+	gap: 28px;
+	flex-wrap: wrap;
+}
+
+.hgp-shipmeta__row {
+	display: flex;
+	align-items: baseline;
+	gap: 8px;
+}
+
+.hgp-shipmeta__row dt {
+	margin: 0;
+	font-size: 12px;
+	letter-spacing: .04em;
+	color: var(--dsp-slate, #5C5A54);
+}
+
+.hgp-shipmeta__row dd {
+	margin: 0;
+	font-family: var(--dsp-mono);
+	font-size: 13px;
+	color: var(--dsp-stamp-dark);
+}
+
+/* Settings groups — worksheet sections divided by hairlines --------- */
+
+.hgp-settings-group {
+	margin: 32px 0 0;
+	padding-top: 16px;
+	border-top: 1px solid var(--dsp-line);
+	font-size: 13px;
+	font-weight: 700;
+	color: var(--dsp-slate);
+	letter-spacing: .02em;
+}
+
+.hgp-settings-group--first {
+	margin-top: 8px;
+	padding-top: 0;
+	border-top: 0;
+}
+
+.hgp-settings-group__note {
+	margin: 4px 0 0;
+	color: var(--dsp-slate);
+	font-size: 12px;
+}
+
+/* Tighten the form-table so grouped tables read as one worksheet */
+.distan-wrap .form-table { margin-top: 8px; }
+
+/* Per-row hairlines inside settings groups — each row reads as one
+   line item on the slip. Lighter than the group divider so the
+   hierarchy (group > row) stays legible. */
+
+.distan-wrap .form-table tr {
+	border-bottom: 1px solid #ECEAE4;
+}
+
+.distan-wrap .form-table tr:last-child {
+	border-bottom: 0;
+}
+
+.distan-wrap .form-table th,
+.distan-wrap .form-table td {
+	padding-top: 18px;
+	padding-bottom: 18px;
+}
+
+/* Save button — set off with a divider so it is not missed at the
+   bottom of a long settings form. */
+.hgp-settings-save {
+	margin-top: 24px;
+	padding-top: 20px;
+	border-top: 1px solid var(--dsp-line);
+}
+
+.hgp-settings-save .button-primary {
+	padding: 4px 20px;
+	height: auto;
+	min-height: 34px;
+	font-size: 14px;
 }

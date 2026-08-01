@@ -150,6 +150,7 @@ class Distan_Admin {
 		$out['keep_indent'] = isset( $input['keep_indent'] ) ? ! empty( $input['keep_indent'] ) : true;
 		$out['export_markdown'] = ! empty( $input['export_markdown'] );
 		$out['export_markdown_local'] = ! empty( $input['export_markdown_local'] );
+		$out['enable_dispatch'] = ! empty( $input['enable_dispatch'] );
 
 		return $out;
 	}
@@ -213,9 +214,12 @@ class Distan_Admin {
 			array(
 				'ajaxUrl' => admin_url( 'admin-ajax.php' ),
 				'nonce'   => wp_create_nonce( 'distan_ajax' ),
+				'dispatchEnabled' => ! empty( Distan::settings()['enable_dispatch'] ),
+				'lastDispatch'    => (int) get_option( 'distan_last_dispatch', 0 ),
 				'i18n'    => array(
 					'checking' => __( '確認中…', 'distan' ),
 					'failed'   => __( '確認に失敗しました。', 'distan' ),
+					'dispatchFailed' => __( 'デプロイに失敗しました。', 'distan' ),
 				),
 			)
 		);
@@ -329,6 +333,31 @@ class Distan_Admin {
 					</div>
 				</template>
 
+				<template x-if="manifest && dispatchEnabled">
+					<div class="hgp-dispatch">
+						<div class="hgp-dispatch__action">
+							<button type="button" class="button button-primary" @click="dispatch()" :disabled="dispatching">
+								<span x-show="!dispatching"><?php esc_html_e( 'デプロイ', 'distan' ); ?></span>
+								<span x-show="dispatching" x-cloak><?php esc_html_e( 'デプロイ中…', 'distan' ); ?></span>
+							</button>
+							<p class="hgp-hint">
+								<?php esc_html_e( '確認できたら押してください。distan_dispatch アクションが発火し、繋いだ公開処理が動きます。', 'distan' ); ?>
+							</p>
+						</div>
+						<div class="hgp-dispatch__error hgp-alert is-error" x-show="dispatchError" x-cloak x-text="dispatchError"></div>
+						<dl class="hgp-shipmeta">
+							<div class="hgp-shipmeta__row">
+								<dt><?php esc_html_e( '最終生成', 'distan' ); ?></dt>
+								<dd x-text="fmtTime(manifest.finished)"></dd>
+							</div>
+							<div class="hgp-shipmeta__row">
+								<dt><?php esc_html_e( '最終デプロイ', 'distan' ); ?></dt>
+								<dd x-text="lastDispatch ? fmtTime(lastDispatch) : '—'"></dd>
+							</div>
+						</dl>
+					</div>
+				</template>
+
 				<template x-if="manifest">
 					<div class="hgp-stats">
 						<div class="hgp-stat">
@@ -433,10 +462,18 @@ class Distan_Admin {
 
 			<!-- Settings -->
 			<section class="hgp-card">
-				<div class="hgp-card__head"><h2><?php esc_html_e( '設定', 'distan' ); ?></h2></div>
-
 				<form method="post" action="options.php">
 					<?php settings_fields( 'distan_settings_group' ); ?>
+
+					<div class="hgp-card__head">
+						<h2><?php esc_html_e( '設定', 'distan' ); ?></h2>
+						<div class="hgp-card__actions">
+							<?php submit_button( __( '設定を保存', 'distan' ), 'primary', 'submit-top', false ); ?>
+						</div>
+					</div>
+
+					<h3 class="hgp-settings-group hgp-settings-group--first"><?php esc_html_e( '基本設定', 'distan' ); ?></h3>
+					<p class="hgp-settings-group__note"><?php esc_html_e( '書き出す静的HTMLの基本設定です。案件に合わせて選びます。', 'distan' ); ?></p>
 					<table class="form-table" role="presentation">
 						<tr>
 							<th scope="row">
@@ -522,15 +559,20 @@ class Distan_Admin {
 								</p>
 							</td>
 						</tr>
-						<tr>
-							<th scope="row"><?php esc_html_e( 'Markdown を書き出す', 'distan' ); ?></th>
+						</table>
+
+						<h3 class="hgp-settings-group"><?php esc_html_e( '追加オプション', 'distan' ); ?></h3>
+						<p class="hgp-settings-group__note"><?php esc_html_e( '必要な場合だけ使うオプションです。通常の納品では設定しなくて構いません。', 'distan' ); ?></p>
+						<table class="form-table" role="presentation">
+							<tr>
+								<th scope="row"><?php esc_html_e( 'Markdown を書き出す', 'distan' ); ?></th>
 							<td>
 								<label>
 									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[export_markdown]" value="1" <?php checked( ! empty( $settings['export_markdown'] ) ); ?>>
 									<?php esc_html_e( 'サイト全体を content.md にまとめる', 'distan' ); ?>
 								</label>
 								<p class="description">
-									<?php esc_html_e( '全ページの本文を1つの Markdown ファイル（content.md）にまとめて書き出します。NotebookLM などの AI ツールにサイト内容を読み込ませる用途に。ヘッダー・フッター・ナビは除き、本文だけを抽出します。URL は公開URL（サイトURL設定）に置換されます。', 'distan' ); ?>
+									<?php esc_html_e( '全ページの本文を1つの Markdown ファイル（content.md）にまとめて書き出します。Gemini Notebook（旧NotebookLM）などの AI ツールにサイト内容を読み込ませる用途に。ヘッダー・フッター・ナビは除き、本文だけを抽出します。URL は公開URL（サイトURL設定）に置換されます。', 'distan' ); ?>
 								</p>
 								<label style="display:block;margin-top:.5em">
 									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[export_markdown_local]" value="1" <?php checked( ! empty( $settings['export_markdown_local'] ) ); ?>>
@@ -541,8 +583,27 @@ class Distan_Admin {
 								</p>
 							</td>
 						</tr>
+						</table>
+
+						<h3 class="hgp-settings-group"><?php esc_html_e( '公開・デプロイ', 'distan' ); ?></h3>
+						<p class="hgp-settings-group__note"><?php esc_html_e( '書き出したあとの公開処理を自分で繋ぐ場合のオプションです。', 'distan' ); ?></p>
+						<table class="form-table" role="presentation">
+							<tr>
+								<th scope="row"><?php esc_html_e( 'デプロイボタン', 'distan' ); ?></th>
+							<td>
+								<label>
+									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[enable_dispatch]" value="1" <?php checked( ! empty( $settings['enable_dispatch'] ) ); ?>>
+									<?php esc_html_e( '生成画面に「デプロイ」ボタンを表示する', 'distan' ); ?>
+								</label>
+								<p class="description">
+									<?php esc_html_e( '生成物を目視で確認したあと、手動で押すためのボタンです。押すと distan_dispatch アクションが発火し、このアクションに繋いだ公開処理（git push / rsync / ビルドWebhook など）が動きます。処理を繋いでいなければ何も起きません。通常の書き出しだけなら不要です。', 'distan' ); ?>
+								</p>
+							</td>
+						</tr>
 					</table>
-					<?php submit_button( __( '設定を保存', 'distan' ) ); ?>
+					<div class="hgp-settings-save">
+						<?php submit_button( __( '設定を保存', 'distan' ), 'primary', 'submit', false ); ?>
+					</div>
 				</form>
 			</section>
 		</div>

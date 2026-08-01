@@ -24,6 +24,7 @@ function distan_uninstall_site(): void {
 		'distan_render_secret',
 		'distan_manifest',
 		'distan_last_report',
+		'distan_last_dispatch',
 	);
 
 	foreach ( $options as $option ) {

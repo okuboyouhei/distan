@@ -223,11 +223,11 @@ WordPress で運用中のサイトの「保険」としても使えます。
 
 ## Markdown 書き出し（AI ツール向け）
 
-設定で「Markdown を書き出す」を有効にすると、全ページの本文を 1 つの Markdown ファイル（`content.md`）にまとめて、出力先に書き出します。NotebookLM などの AI ツールにサイト全体を読み込ませ、内容を自然言語で질問する用途を想定しています。
+設定で「Markdown を書き出す」を有効にすると、全ページの本文を 1 つの Markdown ファイル（`content.md`）にまとめて、出力先に書き出します。Gemini Notebook（旧NotebookLM）などの AI ツールにサイト全体を読み込ませ、内容を自然言語で질問する用途を想定しています。
 
 - ヘッダー・ナビゲーション・フッター・サイドバー・フォームは除き、`<main>`（無ければ `<article>` や本文コンテナ）の**本文だけ**を抽出します。ページごとに見出しと URL を付けて連結します。
 - 静的 HTML の生成と同じ巡回で本文を取得するため、追加のクロールは発生しません。
-- サイトを更新したら再生成すると `content.md` も新しくなります。NotebookLM 側では、ソースを新しい `content.md` に差し替えて使います（サイト更新のたびに手動で入れ直す運用）。
+- サイトを更新したら再生成すると `content.md` も新しくなります。Gemini Notebook 側では、ソースを新しい `content.md` に差し替えて使います（サイト更新のたびに手動で入れ直す運用）。
 - 本文の抽出範囲は `distan_markdown_region` フィルタで調整できます。
 - 書き出される URL は公開 URL（サイト URL 設定）に置換されます。開発・データ管理用に、置換していない版（`content.local.md`）も出力できます（設定で選択）。
 
@@ -299,6 +299,25 @@ add_action( 'distan_after_generate', function ( $manifest, $output_root ) {
 ```
 
 これにより WordPress を「ヘッドレス的」に使えますが、本来のヘッドレス CMS（本番で API サーバーとして動き続ける構成）とは異なり、**本番には静的 HTML しか置きません**。API サーバーすら存在しないぶん、より軽く、より安全です。
+
+### 目視確認を挟む（デプロイフック `distan_dispatch`）
+
+`distan_after_generate` は生成のたびに必ず発火します。リンク切れや崩れがあっても発火するため、無条件でデプロイを繋ぐと壊れた生成物をそのまま本番へ押し出しかねません。機械的なゲート（リンク切れゼロなら流す等）は繋ぐ側の条件分岐で書けますが、レイアウト崩れや文言の誤りのような「人の目でしか気づけない」確認を挟みたい場合のために、`distan_dispatch` を用意しています。
+
+これは**手動のゲート**です。生成画面の「デプロイ」ボタン（設定で有効化）を押したときだけ発火します。承認状態は保存しません——ボタンを押す行為そのものが確認であり、記録するのは最終デプロイ時刻（`distan_last_dispatch`）だけです。
+
+自動配信は `distan_after_generate` でプレビュー環境へ、本番への昇格は `distan_dispatch` で、という二層に分けるのが素直な使い方です。
+
+```php
+/**
+ * @param array $manifest      files / added / removed / broken / cleaned / finished
+ * @param int   $dispatched_at デプロイ時刻（Unix time）
+ */
+add_action( 'distan_dispatch', function ( $manifest, $dispatched_at ) {
+    // 例: 目視確認済みの生成物を本番へ昇格（git push / rsync / ビルド Webhook など）
+    // distan_after_generate でプレビューへ撒き、ここで本番へ、と二層に分ける。
+}, 10, 2 );
+```
 
 ---
 

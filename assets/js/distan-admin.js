@@ -44,6 +44,11 @@
 			genErrors: [],
 			manifest: null,
 
+			dispatchEnabled: !! data.dispatchEnabled,
+			lastDispatch: data.lastDispatch || 0,
+			dispatching: false,
+			dispatchError: '',
+
 			percent: function () {
 				if ( ! this.genTotal ) {
 					return 0;
@@ -158,6 +163,49 @@
 					.finally( function () {
 						self.envLoading = false;
 					} );
+			},
+
+			dispatch: function () {
+				var self = this;
+
+				self.dispatching = true;
+				self.dispatchError = '';
+
+				post( 'distan_dispatch', {} )
+					.then( function ( json ) {
+						if ( ! json || ! json.success ) {
+							self.dispatchError =
+								( json && json.data && json.data.message ) ||
+								( data.i18n && data.i18n.dispatchFailed ) ||
+								'Dispatch failed.';
+							return;
+						}
+
+						self.lastDispatch = json.data.dispatched_at || Math.floor( Date.now() / 1000 );
+					} )
+					.catch( function ( error ) {
+						self.dispatchError = String( error );
+					} )
+					.finally( function () {
+						self.dispatching = false;
+					} );
+			},
+
+			fmtTime: function ( unix ) {
+				if ( ! unix ) {
+					return '—';
+				}
+				var d = new Date( unix * 1000 );
+				var p = function ( n ) {
+					return ( n < 10 ? '0' : '' ) + n;
+				};
+				return (
+					d.getFullYear() +
+					'-' + p( d.getMonth() + 1 ) +
+					'-' + p( d.getDate() ) +
+					' ' + p( d.getHours() ) +
+					':' + p( d.getMinutes() )
+				);
 			}
 		};
 	};

@@ -4,7 +4,7 @@ Tags: static site generator, static, export, html, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.9.16
+Stable tag: 0.9.17
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -65,6 +65,9 @@ Yes, with a classic theme. Block themes load their JavaScript as ES modules, whi
 
 == Changelog ==
 
+= 0.9.17 =
+* Added the `distan_dispatch` action hook and an optional manual "デプロイ" (dispatch) button on the generate screen. After reviewing the generated output, pressing the button fires `distan_dispatch` so a project can promote the reviewed build (git push, rsync, a build webhook). Distan stores no approval state — only the time of the last dispatch, shown on screen. The button is off by default; enable it in settings.
+
 = 0.9.16 =
 * Added the `distan_after_generate` action hook, fired when a generation run completes, for wiring up automatic deployment (git push, rsync, build webhooks, etc.).
 
@@ -73,7 +76,7 @@ Yes, with a classic theme. Block themes load their JavaScript as ES modules, whi
 
 = 0.9.14 =
 * Added the `distan_url_replacements` filter for custom production URL replacements (applied across the whole output, including JSON-LD).
-* Added an optional Markdown export (content.md) that combines every page's main content into one file for AI tools such as NotebookLM. URLs are rewritten to the production site URL; an optional content.local.md keeps development URLs.
+* Added an optional Markdown export (content.md) that combines every page's main content into one file for AI tools such as Gemini Notebook (formerly NotebookLM). URLs are rewritten to the production site URL; an optional content.local.md keeps development URLs.
 
 = 0.9.13 =
 * Initial public release.

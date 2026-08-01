@@ -3,7 +3,7 @@
  * Markdown export.
  *
  * Builds a single Markdown file containing the readable content of every
- * generated page, intended to be fed to an AI tool (NotebookLM, etc.) so a
+ * generated page, intended to be fed to an AI tool (Gemini Notebook, formerly NotebookLM) so a
  * site's contents can be queried in natural language. This is a separate
  * deliverable from the static HTML: it extracts the main content of each
  * page, strips the chrome (header/nav/footer), and concatenates everything

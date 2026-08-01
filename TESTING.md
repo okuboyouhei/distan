@@ -2,7 +2,7 @@
 
 リリース前と、大きな変更を加えたあとの動作確認手順です。毎回このとおりに実行します。
 
-対象バージョン: 0.9.16 / 出力先: `wp-content/uploads/distan/dist/`
+対象バージョン: 0.9.17 / 出力先: `wp-content/uploads/distan/dist/`
 
 ---
 

@@ -19,6 +19,7 @@ class Distan_Ajax {
 		add_action( 'wp_ajax_distan_env_check', array( $this, 'env_check' ) );
 		add_action( 'wp_ajax_distan_start', array( $this, 'start' ) );
 		add_action( 'wp_ajax_distan_batch', array( $this, 'batch' ) );
+		add_action( 'wp_ajax_distan_dispatch', array( $this, 'dispatch' ) );
 	}
 
 	/**
@@ -56,6 +57,60 @@ class Distan_Ajax {
 		}
 
 		wp_send_json_success( $state );
+	}
+
+	/**
+	 * Fire the manual dispatch hook.
+	 *
+	 * This is the human gate: the site owner has looked at the generated
+	 * output and pressed "デプロイ" (dispatch) to promote it. Distan holds no
+	 * approval state — pressing the button IS the confirmation. All we
+	 * record is when it last happened, so the screen can reassure the
+	 * operator and prevent accidental double-clicks. The actual promotion
+	 * (git push / rsync / build webhook) belongs to whatever the project
+	 * hangs off the distan_dispatch action.
+	 */
+	public function dispatch(): void {
+		$this->guard();
+
+		$settings = Distan::settings();
+
+		if ( empty( $settings['enable_dispatch'] ) ) {
+			wp_send_json_error(
+				array( 'message' => __( 'デプロイは無効です。設定で有効にしてください。', 'distan' ) ),
+				400
+			);
+		}
+
+		$manifest = Distan_Generator::manifest();
+
+		if ( empty( $manifest['files'] ) ) {
+			wp_send_json_error(
+				array( 'message' => __( 'デプロイできる生成物がありません。先に生成を実行してください。', 'distan' ) ),
+				400
+			);
+		}
+
+		$now = time();
+
+		/**
+		 * Fires when the operator manually dispatches the current output.
+		 *
+		 * Distan does not deploy — pressing the button only announces that
+		 * the human-reviewed output is cleared to go. Wire your promotion
+		 * step (git push, rsync, an SFTP sync, a Netlify / Cloudflare Pages
+		 * build webhook) to this action. No approval state is stored; the
+		 * press itself is the confirmation.
+		 *
+		 * @param array $manifest The last generation manifest (files, added,
+		 *                        removed, broken, cleaned, finished).
+		 * @param int   $dispatched_at Unix timestamp of this dispatch.
+		 */
+		do_action( 'distan_dispatch', $manifest, $now );
+
+		update_option( 'distan_last_dispatch', $now, false );
+
+		wp_send_json_success( array( 'dispatched_at' => $now ) );
 	}
 
 	/**

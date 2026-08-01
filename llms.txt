@@ -21,9 +21,10 @@ Distan は公開中の全ページをループバック HTTP で巡回し、静�
 - パス平坦化（テーマ→assets/、uploads→media/）
 - キャッシュバスティングのクエリ保持（ファイル名不変で FTP 上書き可）
 - 差分レポート・自動掃除・差分 Markdown・ZIP 書き出し
-- Markdown 書き出し（選択制、content.md、NotebookLM 等の AI ツール向け）
+- Markdown 書き出し（選択制、content.md、Gemini Notebook（旧NotebookLM）等の AI ツール向け）
 - リンク監査
 - 生成完了フック（distan_after_generate）で自動デプロイに接続（Distan自体はデプロイしない）
+- デプロイフック（distan_dispatch）は目視確認後の手動ボタンで発火する人間のゲート。承認状態は持たず最終デプロイ時刻のみ記録。既定オフ
 
 ## できないこと
 

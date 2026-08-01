@@ -96,9 +96,17 @@ Distan は構造化データを**生成しません**。テーマや SEO プラ�
 
 全バッチ完了後、マニフェストとレポートを書き出した直後に一度だけ `do_action( 'distan_after_generate', $manifest, $output_root )` を発火する。**Distan はデプロイを行わない**——このフックは git push / rsync / SFTP / Netlify・Cloudflare Pages の Webhook などを繋ぐための seam。プラグインがデプロイ資格情報やホスト固有の知識を持たずに済むよう、意図的に「知らせるだけ」にしている。本番に WordPress を置かない SSG＋自動デプロイ構成の要。
 
+## デプロイフック（`distan_dispatch`）
+
+`distan_after_generate` が**自動**（生成のたびに必ず発火・状態なし）なのに対し、`distan_dispatch` は**手動の人間ゲート**。生成画面の「デプロイ」ボタン（設定 `enable_dispatch`、既定オフ）を押したときだけ、AJAX ハンドラ `Distan_Ajax::dispatch()` が最後のマニフェストを読んで `do_action( 'distan_dispatch', $manifest, $now )` を発火する。
+
+設計上の要点は「**承認状態を持たない**」こと。「この生成物は OK / NG」という判断を記録すると状態遷移の管理が生まれ、v0.9.16 で引いた「Distan はデプロイをやらない／腐るものを持ち込まない」の線を内側に越える。だから記録するのは `distan_last_dispatch`（最終デプロイ時刻の option 一個）だけ——生成物とも判断とも紐づかない、ただの事実。画面には「最終生成」（`manifest.finished`）と「最終デプロイ」の二行をモノスペースで並べるにとどめ、誰が・何回・デプロイログ一覧、までは踏み込まない（そこは監査ログの領域）。
+
+繋ぐ側の二層構成：`distan_after_generate` で自動的にプレビューへ配信 → 人が目視 →「デプロイ」ボタン → `distan_dispatch` で本番へ昇格。ボタンの作法（nonce `distan_ajax`・capability チェック）は既存の生成 AJAX と同じ `guard()` を共有する。
+
 ## Markdown 書き出し（`Distan_Markdown`、選択制）
 
-設定 `export_markdown` が有効なとき、全ページの本文を 1 ファイル `content.md` にまとめて出力ルートに書き出します。NotebookLM 等の AI ツールにサイト内容を読ませる用途です。
+設定 `export_markdown` が有効なとき、全ページの本文を 1 ファイル `content.md` にまとめて出力ルートに書き出します。Gemini Notebook（旧NotebookLM）等の AI ツールにサイト内容を読ませる用途です。
 
 - 静的 HTML 生成と**同じ巡回**（`render_one` が回収した HTML）から抽出するため、追加のクロールは発生しません
 - `<main>` → `<article>` → 本文コンテナ → `<body>` の優先順で本文領域を絞り、header/nav/footer/aside/form/script/style を除去します

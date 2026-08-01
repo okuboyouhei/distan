@@ -17,9 +17,10 @@ WordPress を制作環境として使い、納品用の静的 HTML を書き出�
 - **パス平坦化** — テーマ→`assets/`、uploads→`media/`、`wp-content` が消える
 - **キャッシュバスティング保持** — アセットのクエリ文字列（`?ver=filemtime` 等）をそのまま保持。ファイル名は不変なので FTP 上書きで更新できる
 - **差分レポート＋自動掃除＋差分 MD＋ZIP** — 再生成のたびに追加/変更/リンク切れを報告。出力先の掃除は自動、削除は報告のみ（本番には触れない）
-- **Markdown 書き出し（選択制）** — 全ページ本文を 1 ファイル `content.md` にまとめる。NotebookLM 等の AI ツール向け。ページネーションは除外。URL は公開 URL に置換（開発用に `content.local.md` も選択可）
+- **Markdown 書き出し（選択制）** — 全ページ本文を 1 ファイル `content.md` にまとめる。Gemini Notebook（旧NotebookLM）等の AI ツール向け。ページネーションは除外。URL は公開 URL に置換（開発用に `content.local.md` も選択可）
 - **リンク監査** — 内部リンクの切れを検出して報告
 - **生成完了フック** — `distan_after_generate`（アクション）で、生成後に任意のデプロイ処理（git push / rsync / Webhook 等）を繋げる。Distan 自体はデプロイしない・認証情報を持たない
+- **デプロイフック** — `distan_dispatch`（アクション）は、生成物を目視確認したあと手動の「デプロイ」ボタンを押したときだけ発火する。`distan_after_generate` が自動（生成のたびに必ず発火）なのに対し、`distan_dispatch` は人間のゲート。プレビュー配信は前者、本番へのデプロイは後者、と二層に分けられる。承認状態は持たず、最終デプロイ時刻（`distan_last_dispatch`）だけを記録する。ボタンは既定オフ、設定で有効化
 
 ## できないこと / やらないこと
 
