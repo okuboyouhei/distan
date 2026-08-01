@@ -34,6 +34,7 @@ class Distan_Env {
 			self::check_image_library(),
 			self::check_execution_time(),
 			self::check_cache_plugins(),
+			self::check_dev_urls(),
 		);
 	}
 
@@ -49,6 +50,46 @@ class Distan_Env {
 			}
 		}
 		return true;
+	}
+
+	/**
+	 * Whether the previous run left development-domain URLs in the output.
+	 *
+	 * This reads the last manifest, so it reports a fact from the previous
+	 * generation rather than predicting. On the first run there is no manifest
+	 * and nothing is reported. It is a warning, not an error: generation still
+	 * works, but structured data / canonical tags would point at the
+	 * development host until the Production URL is set.
+	 *
+	 * @return array<string, string>
+	 */
+	public static function check_dev_urls(): array {
+		$label = __( '開発URLの残り（前回の生成）', 'distan' );
+
+		$manifest = get_option( Distan_Generator::MANIFEST_KEY, array() );
+		$dev      = is_array( $manifest ) && isset( $manifest['dev_urls'] ) && is_array( $manifest['dev_urls'] )
+			? $manifest['dev_urls']
+			: array();
+		$count    = isset( $dev['count'] ) ? (int) $dev['count'] : 0;
+
+		if ( $count > 0 ) {
+			return self::result(
+				'dev_urls',
+				$label,
+				self::STATUS_WARNING,
+				/* translators: %d: number of URLs. */
+				sprintf( __( '%d 件', 'distan' ), $count ),
+				__( '前回の生成物に開発環境のURLが残っていました。canonical・OGP・構造化データで起きます。「公開URL」を設定して再生成すると本番のドメインに置き換わります。', 'distan' )
+			);
+		}
+
+		return self::result(
+			'dev_urls',
+			$label,
+			self::STATUS_OK,
+			__( 'なし', 'distan' ),
+			''
+		);
 	}
 
 	/**

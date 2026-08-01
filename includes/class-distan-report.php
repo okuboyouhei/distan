@@ -63,6 +63,9 @@ class Distan_Report {
 		$removed = isset( $manifest['removed'] ) && is_array( $manifest['removed'] ) ? $manifest['removed'] : array();
 		$broken  = isset( $manifest['broken'] ) && is_array( $manifest['broken'] ) ? $manifest['broken'] : array();
 		$cleaned = isset( $manifest['cleaned'] ) && is_array( $manifest['cleaned'] ) ? $manifest['cleaned'] : array();
+		$dev     = isset( $manifest['dev_urls'] ) && is_array( $manifest['dev_urls'] ) ? $manifest['dev_urls'] : array();
+		$dev_count = isset( $dev['count'] ) ? (int) $dev['count'] : 0;
+		$dev_files = isset( $dev['files'] ) && is_array( $dev['files'] ) ? $dev['files'] : array();
 
 		$finished = (int) ( $manifest['finished'] ?? time() );
 		$when     = get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $finished ), 'Y-m-d H:i' );
@@ -86,7 +89,28 @@ class Distan_Report {
 		$lines[] = '| 追加 | ' . count( $added ) . ' |';
 		$lines[] = '| 出力先から削除 | ' . count( $cleaned ) . ' |';
 		$lines[] = '| リンク切れ | ' . count( $broken ) . ' |';
+		$lines[] = '| 開発URLの残り | ' . $dev_count . ' |';
 		$lines[] = '';
+
+		// A production-correctness issue: development-domain URLs left in the
+		// output (typically in JSON-LD or canonical/OGP when the Production URL
+		// is unset). Surfaced near the top when present.
+		if ( $dev_count > 0 ) {
+			$lines[] = '## ⚠ 開発環境のURLが残っています';
+			$lines[] = '';
+			$lines[] = '生成物に開発環境のドメイン（' . home_url( '/' ) . '）を指すURLが ' . $dev_count . ' 件残っています。';
+			$lines[] = 'canonical・OGP・構造化データ（JSON-LD）など、Distan が書き換えずに運ぶ絶対URLで起きます。';
+			$lines[] = '「公開URL」を設定して再生成すると、本番のドメインに置き換わります。';
+			$lines[] = '';
+			if ( ! empty( $dev_files ) ) {
+				$lines[] = '| 残っているページ |';
+				$lines[] = '| --- |';
+				foreach ( $dev_files as $file ) {
+					$lines[] = '| `' . (string) $file . '` |';
+				}
+				$lines[] = '';
+			}
+		}
 
 		// The section that matters most goes near the top when it is non-empty.
 		if ( ! empty( $removed ) ) {

@@ -4,7 +4,7 @@ Tags: static site generator, static, export, html, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.9.17
+Stable tag: 0.9.18
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -64,6 +64,12 @@ Anything that needs server-side processing: search forms, comment submission, co
 Yes, with a classic theme. Block themes load their JavaScript as ES modules, which browsers refuse to load over `file://`. HTML, CSS, images, and links work either way; use a local server for a complete preview.
 
 == Changelog ==
+
+= 0.9.18 =
+* Fixed: multibyte (e.g. Japanese) page slugs in internal links were corrupted (0x80-0x9F bytes turned into "_"), breaking the link. WordPress emits same-origin links as raw UTF-8; Distan now normalises every link path to a consistent percent-encoded form, so multibyte slugs survive intact in both the output filename and the rewritten link.
+* Added: the generation report and the environment check now surface how many development-domain URLs remain in the output (e.g. in JSON-LD or canonical/OGP tags when the Production URL is unset), so a forgotten Production URL is caught before and after delivery.
+* Fixed: the link audit reported existing pages with multibyte slugs as broken links, because it looked for a decoded name while the file is written with a percent-encoded name. The audit now matches the encoded form.
+* Fixed: url() references inside external CSS were copied verbatim, so theme fonts/images went uncopied and uploads-absolute paths (url("/wp-content/uploads/…")) leaked into delivered files. CSS url() is now resolved, flattened (theme -> assets/, uploads -> media/), its targets copied, and the reference rewritten relative to the stylesheet.
 
 = 0.9.17 =
 * Added the `distan_dispatch` action hook and an optional manual "デプロイ" (dispatch) button on the generate screen. After reviewing the generated output, pressing the button fires `distan_dispatch` so a project can promote the reviewed build (git push, rsync, a build webhook). Distan stores no approval state — only the time of the last dispatch, shown on screen. The button is off by default; enable it in settings.

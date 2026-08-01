@@ -56,6 +56,20 @@ class Distan_Urls {
 	 * Returns null for anything outside the site or otherwise unmappable.
 	 */
 	public static function url_to_output_path( string $url ): ?string {
+		// WordPress emits same-origin links as raw UTF-8 (href="/foo/" with
+		// multibyte characters), but parse_url() mangles multibyte bytes in
+		// the path (0x80-0x9F get corrupted). Percent-encode any raw high
+		// bytes up front so parsing sees ASCII only. Already-encoded input is
+		// untouched because "%" and hex digits are all below 0x80.
+		$url = preg_replace_callback(
+			'/[\x80-\xFF]+/',
+			static function ( $matches ) {
+				return rawurlencode( $matches[0] );
+			},
+			$url
+		);
+		$url = (string) $url;
+
 		$parts = wp_parse_url( $url );
 
 		if ( ! is_array( $parts ) ) {
@@ -71,6 +85,17 @@ class Distan_Urls {
 		}
 
 		$path = isset( $parts['path'] ) ? $parts['path'] : '/';
+
+		// The path may arrive as raw UTF-8 bytes (WordPress emits same-origin
+		// links unencoded, e.g. href="/foo-bar/" with multibyte) or already percent-encoded
+		// (canonical tags, get_permalink). Normalise to a single, consistent
+		// percent-encoded form now, before any further parsing, so multibyte
+		// slugs are handled identically whichever way they came in. Decoding
+		// first collapses an already-encoded path to its raw bytes; re-encoding
+		// per segment then yields one canonical form. Without this, raw
+		// multibyte bytes reach fragile downstream handling and get mangled
+		// (0x80-0x9F bytes were being turned into "_"), corrupting the link.
+		$path = self::normalize_path_encoding( $path );
 
 		// Strip the subdirectory install prefix.
 		$prefix = self::home_path();
@@ -230,13 +255,46 @@ class Distan_Urls {
 	}
 
 	/**
+	 * Normalise a URL path to a single percent-encoded form.
+	 *
+	 * Accepts either raw UTF-8 bytes or already percent-encoded input and
+	 * returns a consistently percent-encoded path. Slashes are preserved as
+	 * separators; only the bytes inside each segment are encoded. Decoding
+	 * once first means an already-encoded segment is not double-encoded.
+	 */
+	private static function normalize_path_encoding( string $path ): string {
+		$lead  = str_starts_with( $path, '/' ) ? '/' : '';
+		$trail = ( strlen( $path ) > 1 && str_ends_with( $path, '/' ) ) ? '/' : '';
+
+		$segments = array_map(
+			static function ( $segment ) {
+				return rawurlencode( rawurldecode( $segment ) );
+			},
+			explode( '/', trim( $path, '/' ) )
+		);
+
+		$body = implode( '/', $segments );
+
+		if ( '' === $body ) {
+			return '' === $lead ? '' : '/';
+		}
+
+		return $lead . $body . $trail;
+	}
+
+	/**
 	 * Output path for a page URL path (no extension).
+	 *
+	 * The incoming path is already percent-encoded and normalised by
+	 * {@see url_to_output_path()}, so segments are used as-is. Emitting the
+	 * raw decoded bytes instead would corrupt the href and break the link
+	 * under file:// and on some servers.
 	 */
 	public static function page_path_for( string $path ): string {
 		$settings = Distan::settings();
 		$flat     = 'flat' === $settings['path_style'];
 
-		$trimmed = trim( rawurldecode( $path ), '/' );
+		$trimmed = trim( $path, '/' );
 
 		if ( '' === $trimmed ) {
 			return 'index.html';
@@ -362,6 +420,124 @@ class Distan_Urls {
 			'html'   => $html,
 			'assets' => self::$asset_queue,
 		);
+	}
+
+	/**
+	 * Rewrite url() references inside a CSS file.
+	 *
+	 * External CSS is copied verbatim by the generator, so url() references in
+	 * it are never touched by {@see rewrite()} (which only sees HTML). That
+	 * leaves theme-relative fonts/images uncopied and uploads-absolute URLs
+	 * (url("/wp-content/uploads/…")) pointing at wp-content in the delivered
+	 * files. This resolves each url() against the stylesheet's original
+	 * location, remaps it through the same flattening rules as other assets
+	 * (theme → assets/, uploads → media/), queues the target for copying, and
+	 * rewrites the url() to a path relative to the stylesheet's *output*
+	 * location. Data URIs, fragments and other origins are left alone.
+	 *
+	 * @param string $css        The stylesheet contents.
+	 * @param string $source_url The stylesheet's original URL (to resolve relative url()).
+	 * @param string $output_path The stylesheet's output path (e.g. assets/css/main.css).
+	 * @return array{css: string, assets: array<string, string>}
+	 */
+	public static function rewrite_css( string $css, string $source_url, string $output_path ): array {
+		self::$asset_queue = array();
+
+		$source_path = (string) wp_parse_url( $source_url, PHP_URL_PATH );
+		$source_dir  = ltrim( (string) dirname( $source_path ), '/' );
+
+		$css = (string) preg_replace_callback(
+			'#url\(\s*([\'"]?)([^)\'"]+)\1\s*\)#i',
+			static function ( $matches ) use ( $source_dir, $output_path ) {
+				$raw = trim( $matches[2] );
+
+				// Leave data URIs, fragments and absolute/other-origin URLs.
+				if ( '' === $raw
+					|| str_starts_with( $raw, 'data:' )
+					|| str_starts_with( $raw, '#' )
+					|| preg_match( '#^https?://#i', $raw )
+					|| str_starts_with( $raw, '//' )
+				) {
+					return $matches[0];
+				}
+
+				// Resolve to a site-root-relative path.
+				if ( str_starts_with( $raw, '/' ) ) {
+					$abs = ltrim( $raw, '/' );
+				} else {
+					$abs = self::collapse_relative( $source_dir . '/' . $raw );
+				}
+
+				// Strip a query/fragment for the filesystem lookup, keep it for output.
+				$suffix = '';
+				$clean  = $abs;
+				$pos    = strcspn( $abs, '?#' );
+				if ( $pos < strlen( $abs ) ) {
+					$clean  = substr( $abs, 0, $pos );
+					$suffix = substr( $abs, $pos );
+				}
+
+				$mapped = self::remap_asset( rawurldecode( $clean ) );
+
+				self::maybe_queue_asset( $mapped );
+
+				// If it did not resolve to a real, copied asset, leave as-is.
+				if ( ! isset( self::$asset_queue[ $mapped ] ) ) {
+					return $matches[0];
+				}
+
+				$relative = self::relative_between( $output_path, $mapped );
+
+				return 'url(' . $matches[1] . $relative . $suffix . $matches[1] . ')';
+			},
+			$css
+		);
+
+		return array(
+			'css'    => $css,
+			'assets' => self::$asset_queue,
+		);
+	}
+
+	/**
+	 * Collapse a relative path (resolve "." and "..") without touching disk.
+	 */
+	private static function collapse_relative( string $path ): string {
+		$parts = explode( '/', $path );
+		$out   = array();
+		foreach ( $parts as $part ) {
+			if ( '' === $part || '.' === $part ) {
+				continue;
+			}
+			if ( '..' === $part ) {
+				array_pop( $out );
+				continue;
+			}
+			$out[] = $part;
+		}
+		return implode( '/', $out );
+	}
+
+	/**
+	 * Document-relative path from one output file to another.
+	 */
+	private static function relative_between( string $from_file, string $to_file ): string {
+		$from = explode( '/', trim( (string) dirname( $from_file ), '/' ) );
+		$to   = explode( '/', $to_file );
+
+		if ( array( '' ) === $from ) {
+			$from = array();
+		}
+
+		// Drop the common prefix.
+		while ( ! empty( $from ) && ! empty( $to ) && $from[0] === $to[0] ) {
+			array_shift( $from );
+			array_shift( $to );
+		}
+
+		$up = str_repeat( '../', count( $from ) );
+
+		return $up . implode( '/', $to );
 	}
 
 	/**

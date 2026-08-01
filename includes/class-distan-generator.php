@@ -104,6 +104,7 @@ class Distan_Generator {
 		if ( $done ) {
 			$job['assets_copied'] = self::copy_assets( $job['assets'] );
 			$job['broken']        = self::audit_links( $job['written'] );
+			$job['dev_urls']      = self::audit_dev_urls( $job['written'] );
 			$job['cleaned']       = self::clean_output( $job );
 
 			if ( Distan_Markdown::is_enabled() && ! empty( $job['md_sections'] ) ) {
@@ -244,7 +245,21 @@ class Distan_Generator {
 	private static function copy_assets( array $assets ): int {
 		$copied = 0;
 
-		foreach ( $assets as $relative => $source ) {
+		// A queue so assets discovered inside CSS (fonts, images) are copied
+		// too. Seeded with the assets collected from HTML.
+		$queue = $assets;
+		$done  = array();
+
+		while ( ! empty( $queue ) ) {
+			$relative = (string) array_key_first( $queue );
+			$source   = $queue[ $relative ];
+			unset( $queue[ $relative ] );
+
+			if ( isset( $done[ $relative ] ) ) {
+				continue;
+			}
+			$done[ $relative ] = true;
+
 			if ( ! is_file( $source ) || ! is_readable( $source ) ) {
 				continue;
 			}
@@ -255,12 +270,43 @@ class Distan_Generator {
 				continue;
 			}
 
+			// For stylesheets, rewrite url() references and pull in whatever
+			// they point at (theme fonts/images, uploads) so the delivered CSS
+			// resolves and no wp-content path leaks through.
+			if ( 'css' === strtolower( (string) pathinfo( $relative, PATHINFO_EXTENSION ) ) ) {
+				$source_url = self::source_url_for( $source );
+				$result     = Distan_Urls::rewrite_css( $contents, $source_url, $relative );
+				$contents   = $result['css'];
+
+				foreach ( $result['assets'] as $out => $src ) {
+					if ( ! isset( $done[ $out ] ) && ! isset( $queue[ $out ] ) ) {
+						$queue[ $out ] = $src;
+					}
+				}
+			}
+
 			if ( Distan_Paths::write( $relative, $contents ) ) {
 				$copied++;
 			}
 		}
 
 		return $copied;
+	}
+
+	/**
+	 * Reconstruct a stylesheet's site-root-relative URL from its file path,
+	 * so url() references inside it can be resolved. Falls back to the file's
+	 * basename when the path is outside ABSPATH.
+	 */
+	private static function source_url_for( string $file ): string {
+		$root = Distan_Paths::normalize( untrailingslashit( ABSPATH ) );
+		$norm = Distan_Paths::normalize( $file );
+
+		if ( str_starts_with( $norm, $root . '/' ) ) {
+			return '/' . ltrim( substr( $norm, strlen( $root ) ), '/' );
+		}
+
+		return '/' . basename( $file );
 	}
 
 	/**
@@ -276,6 +322,67 @@ class Distan_Generator {
 	 * @param array<int, string> $written Output paths that were written.
 	 * @return array<int, array{from: string, to: string}>
 	 */
+	/**
+	 * Scan the written output for URLs that still carry the development
+	 * domain (the host of home_url()). These appear in places Distan preserves
+	 * rather than rewrites — most importantly JSON-LD and canonical/OGP tags —
+	 * when the Production URL setting is empty, so there is nothing to replace
+	 * the development host with. Leaving the development domain in structured
+	 * data means the live site points at a host that does not exist in
+	 * production, so this is surfaced (fact-based) in the report and, from the
+	 * saved count, in the pre-generation environment check.
+	 *
+	 * @param array $written Relative paths of written HTML files.
+	 * @return array{count:int, files:array<int,string>} Detection summary.
+	 */
+	private static function audit_dev_urls( array $written ): array {
+		$root = Distan_Paths::output_root();
+
+		$home = wp_parse_url( home_url( '/' ) );
+		$host = isset( $home['host'] ) ? (string) $home['host'] : '';
+
+		if ( '' === $host ) {
+			return array(
+				'count' => 0,
+				'files' => array(),
+			);
+		}
+
+		// Match the development host as it appears inside URLs, e.g.
+		// "http://distan.local/…". Both raw and percent-encoded slugs keep the
+		// host in ASCII, so a plain host match is enough.
+		$needle = '#https?://' . preg_quote( $host, '#' ) . '#i';
+
+		$count = 0;
+		$files = array();
+
+		foreach ( $written as $relative ) {
+			$file = $root . '/' . $relative;
+
+			if ( ! is_file( $file ) ) {
+				continue;
+			}
+
+			$html = file_get_contents( $file ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+
+			if ( false === $html ) {
+				continue;
+			}
+
+			$hits = preg_match_all( $needle, $html );
+
+			if ( $hits ) {
+				$count   += $hits;
+				$files[] = $relative;
+			}
+		}
+
+		return array(
+			'count' => $count,
+			'files' => $files,
+		);
+	}
+
 	private static function audit_links( array $written ): array {
 		$root   = Distan_Paths::output_root();
 		$broken = array();
@@ -328,9 +435,14 @@ class Distan_Generator {
 					continue;
 				}
 
+				// Files are written with percent-encoded names (multibyte slugs
+				// stay encoded on disk), and links carry the same encoded form.
+				// Match against the encoded path as-is; decoding here would look
+				// for a decoded name that does not exist and report a false
+				// broken link.
 				$target = $absolute_target
-					? self::collapse( $root . '/' . rawurldecode( $link ) )
-					: self::collapse( $dir . '/' . rawurldecode( $link ) );
+					? self::collapse( $root . '/' . $link )
+					: self::collapse( $dir . '/' . $link );
 
 				if ( file_exists( $target ) ) {
 					continue;
@@ -503,6 +615,10 @@ class Distan_Generator {
 				'added'    => array_values( array_diff( $current, $previous ) ),
 				'broken'   => isset( $job['broken'] ) ? $job['broken'] : array(),
 				'cleaned'  => isset( $job['cleaned'] ) ? $job['cleaned'] : array(),
+				'dev_urls' => isset( $job['dev_urls'] ) ? $job['dev_urls'] : array(
+					'count' => 0,
+					'files' => array(),
+				),
 				'has_modules' => ! empty( $job['has_modules'] ),
 				'finished' => time(),
 			),
