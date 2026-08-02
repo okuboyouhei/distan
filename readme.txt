@@ -4,7 +4,7 @@ Tags: static site generator, static, export, html, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 0.9.18
+Stable tag: 1.0.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -64,6 +64,9 @@ Anything that needs server-side processing: search forms, comment submission, co
 Yes, with a classic theme. Block themes load their JavaScript as ES modules, which browsers refuse to load over `file://`. HTML, CSS, images, and links work either way; use a local server for a complete preview.
 
 == Changelog ==
+
+= 1.0.0 =
+* First stable release. Classic and block (FSE) themes are both supported and have been verified across the hard cases: internal links and multibyte slugs, JSON-LD and canonical/OGP, srcset and path flattening, CSS url() and webfonts, custom post types and fields, diff-based cleanup, Markdown export, hooks, and a safe uninstall that never touches the delivered files.
 
 = 0.9.18 =
 * Fixed: multibyte (e.g. Japanese) page slugs in internal links were corrupted (0x80-0x9F bytes turned into "_"), breaking the link. WordPress emits same-origin links as raw UTF-8; Distan now normalises every link path to a consistent percent-encoded form, so multibyte slugs survive intact in both the output filename and the rewritten link.
