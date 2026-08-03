@@ -4,7 +4,7 @@ Tags: static site generator, static, export, html, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.0.0
+Stable tag: 1.1.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -64,6 +64,13 @@ Anything that needs server-side processing: search forms, comment submission, co
 Yes, with a classic theme. Block themes load their JavaScript as ES modules, which browsers refuse to load over `file://`. HTML, CSS, images, and links work either way; use a local server for a complete preview.
 
 == Changelog ==
+
+= 1.1.0 =
+* Added: optional sitemap.xml generation. Built from the pages that were actually generated, using the production URL, in the standard format Google Search Console accepts. Author and date archives are never collected, so IDs like ?author=1 cannot leak into it.
+* Added: sitemap exclusions by slug prefix (/private/ excludes everything under it) or substring (draft excludes any URL containing it), via a setting or the distan_sitemap_exclude filter.
+* Added: optional minimal robots.txt (Allow: /, plus a Sitemap: line when the sitemap is enabled).
+* The development-URL audit now also scans sitemap.xml and robots.txt, so a leftover development host in them is reported like anywhere else.
+* The diff-based cleanup now keeps sitemap.xml, robots.txt and the Markdown files, so they are not removed on the next run.
 
 = 1.0.0 =
 * First stable release. Classic and block (FSE) themes are both supported and have been verified across the hard cases: internal links and multibyte slugs, JSON-LD and canonical/OGP, srcset and path flattening, CSS url() and webfonts, custom post types and fields, diff-based cleanup, Markdown export, hooks, and a safe uninstall that never touches the delivered files.

@@ -104,12 +104,28 @@ class Distan_Generator {
 		if ( $done ) {
 			$job['assets_copied'] = self::copy_assets( $job['assets'] );
 			$job['broken']        = self::audit_links( $job['written'] );
-			$job['dev_urls']      = self::audit_dev_urls( $job['written'] );
-			$job['cleaned']       = self::clean_output( $job );
 
 			if ( Distan_Markdown::is_enabled() && ! empty( $job['md_sections'] ) ) {
 				$job['md_written'] = Distan_Markdown::write( $job['md_sections'] );
 			}
+
+			// Write sitemap.xml / robots.txt before the development-URL audit
+			// so any leftover development host in them (e.g. when the
+			// Production URL is unset) is caught too — a sitemap submitted to
+			// search engines with the wrong host is exactly the accident the
+			// audit exists to prevent.
+			$job['sitemap'] = Distan_Sitemap::write( $job['queue'] );
+			$job['robots']  = Distan_Sitemap::write_robots();
+
+			$scan = $job['written'];
+			foreach ( array( $job['sitemap'], $job['robots'] ) as $extra ) {
+				if ( is_string( $extra ) && '' !== $extra ) {
+					$scan[] = $extra;
+				}
+			}
+
+			$job['dev_urls'] = self::audit_dev_urls( $scan );
+			$job['cleaned']  = self::clean_output( $job );
 
 			self::write_manifest( $job );
 
@@ -528,8 +544,25 @@ class Distan_Generator {
 			return array();
 		}
 
+		$keep_extra = array();
+		foreach ( array(
+			isset( $job['sitemap'] ) ? $job['sitemap'] : null,
+			isset( $job['robots'] ) ? $job['robots'] : null,
+		) as $extra ) {
+			if ( is_string( $extra ) && '' !== $extra ) {
+				$keep_extra[] = $extra;
+			}
+		}
+		// Markdown deliverables, when they were written this run.
+		if ( ! empty( $job['md_written'] ) ) {
+			$keep_extra[] = Distan_Markdown::FILENAME;
+			if ( Distan_Markdown::wants_local_copy() ) {
+				$keep_extra[] = Distan_Markdown::FILENAME_LOCAL;
+			}
+		}
+
 		$keep = array_flip(
-			array_merge( $job['written'], array_keys( $job['assets'] ) )
+			array_merge( $job['written'], array_keys( $job['assets'] ), $keep_extra )
 		);
 
 		$deleted = array();

@@ -18,6 +18,8 @@ WordPress を制作環境として使い、納品用の静的 HTML を書き出�
 - **キャッシュバスティング保持** — アセットのクエリ文字列（`?ver=filemtime` 等）をそのまま保持。ファイル名は不変なので FTP 上書きで更新できる
 - **差分レポート＋自動掃除＋差分 MD＋ZIP** — 再生成のたびに追加/変更/リンク切れを報告。出力先の掃除は自動、削除は報告のみ（本番には触れない）
 - **Markdown 書き出し（選択制）** — 全ページ本文を 1 ファイル `content.md` にまとめる。Gemini Notebook（旧NotebookLM）等の AI ツール向け。ページネーションは除外。URL は公開 URL に置換（開発用に `content.local.md` も選択可）
+- **サイトマップ書き出し（選択制）** — 生成したページから `sitemap.xml` を作る（Google Search Console 対応の標準形式）。URL は公開 URL。著者・日付アーカイブは収集対象外なので `?author=1` 等の ID は載らない。`/private/`（スラッグ以下）や `draft`（語を含む）で除外指定できる（設定 または `distan_sitemap_exclude` フィルタ）
+- **robots.txt 書き出し（選択制）** — 最小構成（`Allow: /`）。サイトマップが有効なときは `Sitemap:` 行も記載。既にサーバーに robots.txt がある場合はオフにする
 - **リンク監査** — 内部リンクの切れを検出して報告
 - **生成完了フック** — `distan_after_generate`（アクション）で、生成後に任意のデプロイ処理（git push / rsync / Webhook 等）を繋げる。Distan 自体はデプロイしない・認証情報を持たない
 - **デプロイフック** — `distan_dispatch`（アクション）は、生成物を目視確認したあと手動の「デプロイ」ボタンを押したときだけ発火する。`distan_after_generate` が自動（生成のたびに必ず発火）なのに対し、`distan_dispatch` は人間のゲート。プレビュー配信は前者、本番へのデプロイは後者、と二層に分けられる。承認状態は持たず、最終デプロイ時刻（`distan_last_dispatch`）だけを記録する。ボタンは既定オフ、設定で有効化
@@ -35,7 +37,7 @@ WordPress を制作環境として使い、納品用の静的 HTML を書き出�
 
 ## 主なフィルタ
 
-`distan_taxonomies` `distan_post_types` `distan_collect` `distan_archive_max_pages` `distan_term_max_pages` `distan_404_probe` `distan_flatten_theme` `distan_uploads_dir` `distan_clean_html` `distan_clean_output` `distan_remove_global_styles` `distan_robots` `distan_head_actions` `distan_dequeue_handles` `distan_blocked_extensions` `distan_capability` `distan_url_replacements` `distan_markdown_region`
+`distan_taxonomies` `distan_post_types` `distan_collect` `distan_archive_max_pages` `distan_term_max_pages` `distan_404_probe` `distan_flatten_theme` `distan_uploads_dir` `distan_clean_html` `distan_clean_output` `distan_remove_global_styles` `distan_robots` `distan_head_actions` `distan_dequeue_handles` `distan_blocked_extensions` `distan_capability` `distan_url_replacements` `distan_markdown_region` `distan_sitemap_exclude` `distan_sitemap_entries` `distan_robots_lines`
 
 ## 前提・注意
 

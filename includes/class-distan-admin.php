@@ -150,6 +150,12 @@ class Distan_Admin {
 		$out['keep_indent'] = isset( $input['keep_indent'] ) ? ! empty( $input['keep_indent'] ) : true;
 		$out['export_markdown'] = ! empty( $input['export_markdown'] );
 		$out['export_markdown_local'] = ! empty( $input['export_markdown_local'] );
+
+		$out['sitemap']         = ! empty( $input['sitemap'] );
+		$out['sitemap_exclude'] = isset( $input['sitemap_exclude'] )
+			? sanitize_textarea_field( (string) $input['sitemap_exclude'] )
+			: '';
+		$out['robots']          = ! empty( $input['robots'] );
 		$out['enable_dispatch'] = ! empty( $input['enable_dispatch'] );
 
 		return $out;
@@ -580,6 +586,37 @@ class Distan_Admin {
 								</label>
 								<p class="description">
 									<?php esc_html_e( '開発・データ管理用に、URL を置換していない版も出力します。納品物には通常不要です。', 'distan' ); ?>
+								</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><?php esc_html_e( 'サイトマップを書き出す', 'distan' ); ?></th>
+							<td>
+								<label>
+									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[sitemap]" value="1" <?php checked( ! empty( $settings['sitemap'] ) ); ?>>
+									<?php esc_html_e( 'sitemap.xml を書き出す', 'distan' ); ?>
+								</label>
+								<p class="description">
+									<?php esc_html_e( '書き出したページから sitemap.xml を生成します。Google Search Console に登録できる標準形式です。著者や日付のアーカイブは生成対象外のため、?author=1 のような ID がサイトマップに載ることはありません。URL は公開URL（サイトURL設定）になります。', 'distan' ); ?>
+								</p>
+								<label style="display:block;margin-top:.75em" for="distan-sitemap-exclude">
+									<?php esc_html_e( 'サイトマップから除外する（1行に1つ）', 'distan' ); ?>
+								</label>
+								<textarea id="distan-sitemap-exclude" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[sitemap_exclude]" rows="4" class="large-text code" placeholder="/private/&#10;draft"><?php echo esc_textarea( (string) $settings['sitemap_exclude'] ); ?></textarea>
+								<p class="description">
+									<?php esc_html_e( '「/private/」のようにスラッシュで始めると、そのスラッグ以下をすべて除外します。「draft」のように書くと、その語をパスに含むURLを除外します。', 'distan' ); ?>
+								</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><?php esc_html_e( 'robots.txt を書き出す', 'distan' ); ?></th>
+							<td>
+								<label>
+									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[robots]" value="1" <?php checked( ! empty( $settings['robots'] ) ); ?>>
+									<?php esc_html_e( 'robots.txt を書き出す', 'distan' ); ?>
+								</label>
+								<p class="description">
+									<?php esc_html_e( '「すべてクロールを許可」する最小の robots.txt を書き出します。上のサイトマップが有効なときは、その場所（Sitemap:）も記載します。すでにサーバーに robots.txt を置いている場合は、オフのままにしてください。', 'distan' ); ?>
 								</p>
 							</td>
 						</tr>
