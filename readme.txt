@@ -4,7 +4,7 @@ Tags: static site generator, static, export, html, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.1.0
+Stable tag: 1.1.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -64,6 +64,10 @@ Anything that needs server-side processing: search forms, comment submission, co
 Yes, with a classic theme. Block themes load their JavaScript as ES modules, which browsers refuse to load over `file://`. HTML, CSS, images, and links work either way; use a local server for a complete preview.
 
 == Changelog ==
+
+= 1.1.1 =
+* Changed: binary assets (images, PDFs, fonts, video) are now stream-copied instead of read fully into memory, so large files no longer inflate memory during generation. Stylesheets are still read in memory because their url() references are rewritten.
+* Added: files above a size threshold (10 MB by default, filter distan_large_file_threshold) are listed in the report as "large files". They are still copied automatically; the list is a heads-up for delivery size and CDN decisions, not a manual step.
 
 = 1.1.0 =
 * Added: optional sitemap.xml generation. Built from the pages that were actually generated, using the production URL, in the standard format Google Search Console accepts. Author and date archives are never collected, so IDs like ?author=1 cannot leak into it.

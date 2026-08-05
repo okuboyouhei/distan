@@ -102,7 +102,9 @@ class Distan_Generator {
 		$done = $job['index'] >= $job['total'];
 
 		if ( $done ) {
-			$job['assets_copied'] = self::copy_assets( $job['assets'] );
+			$assets_result        = self::copy_assets( $job['assets'] );
+			$job['assets_copied'] = $assets_result['copied'];
+			$job['large_files']   = $assets_result['large_files'];
 			$job['broken']        = self::audit_links( $job['written'] );
 
 			if ( Distan_Markdown::is_enabled() && ! empty( $job['md_sections'] ) ) {
@@ -258,8 +260,18 @@ class Distan_Generator {
 	 *
 	 * @param array<string, string> $assets Output path => source path.
 	 */
-	private static function copy_assets( array $assets ): int {
-		$copied = 0;
+	private static function copy_assets( array $assets ): array {
+		$copied      = 0;
+		$large_files = array(); // relative => size in bytes (for the report).
+
+		/**
+		 * Filter the size (in bytes) above which a copied asset is flagged
+		 * as "large" in the report. The file is still copied; this only
+		 * controls the warning. Default 10 MB.
+		 *
+		 * @param int $threshold Size in bytes.
+		 */
+		$threshold = (int) apply_filters( 'distan_large_file_threshold', 10 * 1024 * 1024 );
 
 		// A queue so assets discovered inside CSS (fonts, images) are copied
 		// too. Seeded with the assets collected from HTML.
@@ -280,16 +292,24 @@ class Distan_Generator {
 				continue;
 			}
 
-			$contents = file_get_contents( $source ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
-
-			if ( false === $contents ) {
-				continue;
+			// Flag large files for the report. They are still copied below;
+			// this is a heads-up, not an exclusion.
+			$size = (int) filesize( $source );
+			if ( $size > $threshold ) {
+				$large_files[ $relative ] = $size;
 			}
 
 			// For stylesheets, rewrite url() references and pull in whatever
 			// they point at (theme fonts/images, uploads) so the delivered CSS
-			// resolves and no wp-content path leaks through.
+			// resolves and no wp-content path leaks through. This needs the
+			// contents in memory; stylesheets are small.
 			if ( 'css' === strtolower( (string) pathinfo( $relative, PATHINFO_EXTENSION ) ) ) {
+				$contents = file_get_contents( $source ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+
+				if ( false === $contents ) {
+					continue;
+				}
+
 				$source_url = self::source_url_for( $source );
 				$result     = Distan_Urls::rewrite_css( $contents, $source_url, $relative );
 				$contents   = $result['css'];
@@ -299,14 +319,24 @@ class Distan_Generator {
 						$queue[ $out ] = $src;
 					}
 				}
-			}
 
-			if ( Distan_Paths::write( $relative, $contents ) ) {
-				$copied++;
+				if ( Distan_Paths::write( $relative, $contents ) ) {
+					$copied++;
+				}
+			} else {
+				// Binary assets (images, PDFs, fonts, video) are not
+				// rewritten, so stream-copy them to avoid loading large
+				// files whole into memory.
+				if ( Distan_Paths::copy_stream( $relative, $source ) ) {
+					$copied++;
+				}
 			}
 		}
 
-		return $copied;
+		return array(
+			'copied'      => $copied,
+			'large_files' => $large_files,
+		);
 	}
 
 	/**
@@ -653,6 +683,7 @@ class Distan_Generator {
 					'files' => array(),
 				),
 				'has_modules' => ! empty( $job['has_modules'] ),
+				'large_files' => isset( $job['large_files'] ) ? $job['large_files'] : array(),
 				'finished' => time(),
 			),
 			false

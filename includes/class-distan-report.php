@@ -66,6 +66,7 @@ class Distan_Report {
 		$dev     = isset( $manifest['dev_urls'] ) && is_array( $manifest['dev_urls'] ) ? $manifest['dev_urls'] : array();
 		$dev_count = isset( $dev['count'] ) ? (int) $dev['count'] : 0;
 		$dev_files = isset( $dev['files'] ) && is_array( $dev['files'] ) ? $dev['files'] : array();
+		$large   = isset( $manifest['large_files'] ) && is_array( $manifest['large_files'] ) ? $manifest['large_files'] : array();
 
 		$finished = (int) ( $manifest['finished'] ?? time() );
 		$when     = get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $finished ), 'Y-m-d H:i' );
@@ -90,6 +91,7 @@ class Distan_Report {
 		$lines[] = '| 出力先から削除 | ' . count( $cleaned ) . ' |';
 		$lines[] = '| リンク切れ | ' . count( $broken ) . ' |';
 		$lines[] = '| 開発URLの残り | ' . $dev_count . ' |';
+		$lines[] = '| 大きいファイル | ' . count( $large ) . ' |';
 		$lines[] = '';
 
 		// A production-correctness issue: development-domain URLs left in the
@@ -137,6 +139,21 @@ class Distan_Report {
 				$from = isset( $b['from'] ) ? (string) $b['from'] : '';
 				$to   = isset( $b['to'] ) ? (string) $b['to'] : '';
 				$lines[] = '| `' . $from . '` | `' . $to . '` |';
+			}
+			$lines[] = '';
+		}
+
+		if ( ! empty( $large ) ) {
+			$lines[] = '## 大きいファイル';
+			$lines[] = '';
+			$lines[] = '一定サイズを超えるファイルです。これらは自動でコピー済みで、手作業は不要です。';
+			$lines[] = '納品物のサイズや配信方法（CDN など）を検討する際の参考にしてください。';
+			$lines[] = '';
+			$lines[] = '| ファイル | サイズ |';
+			$lines[] = '| --- | ---: |';
+			arsort( $large );
+			foreach ( $large as $file => $bytes ) {
+				$lines[] = '| `' . (string) $file . '` | ' . self::format_size( (int) $bytes ) . ' |';
 			}
 			$lines[] = '';
 		}
@@ -242,5 +259,23 @@ class Distan_Report {
 		$zip->close();
 
 		return is_file( $zip_path ) ? $zip_path : null;
+	}
+
+	/**
+	 * Format a byte count as a human-readable size (KB / MB / GB).
+	 *
+	 * @param int $bytes Size in bytes.
+	 */
+	private static function format_size( int $bytes ): string {
+		if ( $bytes >= 1073741824 ) {
+			return number_format( $bytes / 1073741824, 1 ) . ' GB';
+		}
+		if ( $bytes >= 1048576 ) {
+			return number_format( $bytes / 1048576, 1 ) . ' MB';
+		}
+		if ( $bytes >= 1024 ) {
+			return number_format( $bytes / 1024, 1 ) . ' KB';
+		}
+		return $bytes . ' B';
 	}
 }

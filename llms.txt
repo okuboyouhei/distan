@@ -21,6 +21,7 @@ Distan は公開中の全ページをループバック HTTP で巡回し、静�
 - パス平坦化（テーマ→assets/、uploads→media/）
 - キャッシュバスティングのクエリ保持（ファイル名不変で FTP 上書き可）
 - 差分レポート・自動掃除・差分 Markdown・ZIP 書き出し
+- 大きいファイルの検出と警告（バイナリはストリームコピー、一定サイズ超はレポートに一覧。既定 10MB、distan_large_file_threshold で変更可。コピーはするので手作業不要）
 - Markdown 書き出し（選択制、content.md、Gemini Notebook（旧NotebookLM）等の AI ツール向け）
 - サイトマップ書き出し（選択制、sitemap.xml、Google Search Console 対応。著者・日付アーカイブは載せないので ID 露出なし。スラッグ以下や語を含む URL を除外可）
 - robots.txt 書き出し（選択制、最小構成。サイトマップ有効時は Sitemap: 行を記載）

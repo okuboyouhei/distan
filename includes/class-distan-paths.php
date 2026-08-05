@@ -211,4 +211,37 @@ class Distan_Paths {
 
 		return false !== file_put_contents( $absolute, $contents, LOCK_EX ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
 	}
+
+	/**
+	 * Stream-copy a source file into the output root without loading the
+	 * whole file into memory. Used for binary assets (images, PDFs, fonts,
+	 * video) whose contents are not rewritten. Returns false on any doubt.
+	 *
+	 * @param string $relative Output-relative path.
+	 * @param string $source   Absolute source path.
+	 */
+	public static function copy_stream( string $relative, string $source ): bool {
+		$absolute = self::resolve_output( $relative );
+
+		if ( null === $absolute ) {
+			return false;
+		}
+
+		if ( ! self::ensure_dir( self::output_root() ) ) {
+			return false;
+		}
+
+		if ( ! self::ensure_dir( dirname( $absolute ) ) ) {
+			return false;
+		}
+
+		// Final containment check, immediately before the copy.
+		if ( ! self::is_contained( $absolute ) ) {
+			return false;
+		}
+
+		// copy() streams the file, so large binaries are not loaded whole
+		// into memory the way file_get_contents() would.
+		return copy( $source, $absolute ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_copy
+	}
 }
