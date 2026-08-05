@@ -285,10 +285,17 @@ class Distan_Urls {
 	/**
 	 * Output path for a page URL path (no extension).
 	 *
-	 * The incoming path is already percent-encoded and normalised by
-	 * {@see url_to_output_path()}, so segments are used as-is. Emitting the
-	 * raw decoded bytes instead would corrupt the href and break the link
-	 * under file:// and on some servers.
+	 * The incoming path arrives percent-encoded and normalised from
+	 * {@see url_to_output_path()}. The on-disk name, however, must be the raw
+	 * (decoded) form: a browser or web server percent-decodes an href before
+	 * it looks for the file, so a link to "%E3%83%86.../" resolves to a folder
+	 * named "テスト". Writing the literal "%E3%83%86..." name instead only
+	 * matches when the request is double-encoded — which is why a multibyte
+	 * slug opens by double-click yet breaks through its own link (and gets
+	 * silently served by WordPress when the export sits inside a live site).
+	 * The href is re-encoded in {@see convert_single()}; here we emit the
+	 * decoded segments so the file on disk matches what that href resolves to.
+	 * Assets already follow this rule (the rawurldecode in url_to_output_path).
 	 */
 	public static function page_path_for( string $path ): string {
 		$settings = Distan::settings();
@@ -300,7 +307,28 @@ class Distan_Urls {
 			return 'index.html';
 		}
 
-		return $flat ? $trimmed . '.html' : $trimmed . '/index.html';
+		// Decode each segment so a multibyte slug becomes its real UTF-8 name
+		// on disk (テスト, not %E3%83%86%E3%82%B9%E3%83%88). Slashes are kept as
+		// separators; only the bytes inside a segment are decoded.
+		$decoded = implode(
+			'/',
+			array_map( 'rawurldecode', explode( '/', $trimmed ) )
+		);
+
+		return $flat ? $decoded . '.html' : $decoded . '/index.html';
+	}
+
+	/**
+	 * Percent-encode an output path for use in an href.
+	 *
+	 * Segments are encoded individually so the slash separators survive. This
+	 * is the inverse of the decoding in {@see page_path_for()} (and the asset
+	 * rawurldecode), so decode(encode(path)) returns the real on-disk name.
+	 * Emitting the encoded (ASCII) form rather than raw UTF-8 also keeps hrefs
+	 * immune to the byte mangling that raw multibyte links have hit before.
+	 */
+	private static function encode_output_path( string $path ): string {
+		return implode( '/', array_map( 'rawurlencode', explode( '/', $path ) ) );
 	}
 
 	/**
@@ -657,7 +685,11 @@ class Distan_Urls {
 		// Keep the query only for real files (assets); drop it for pages.
 		$keep_query = '' !== $query && self::looks_like_file( '/' . $target );
 
-		return $prefix . $target . ( $keep_query ? '?' . $query : '' ) . $fragment;
+		// $target is the real, decoded on-disk path. Re-encode each segment for
+		// the href so the emitted URL is canonical ASCII, which a browser or
+		// server then decodes back to that on-disk name. maybe_queue_asset()
+		// and looks_like_file() above intentionally use the decoded $target.
+		return $prefix . self::encode_output_path( $target ) . ( $keep_query ? '?' . $query : '' ) . $fragment;
 	}
 
 	/**

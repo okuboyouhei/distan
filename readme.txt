@@ -4,7 +4,7 @@ Tags: static site generator, static, export, html, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.1.1
+Stable tag: 1.1.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -64,6 +64,12 @@ Anything that needs server-side processing: search forms, comment submission, co
 Yes, with a classic theme. Block themes load their JavaScript as ES modules, which browsers refuse to load over `file://`. HTML, CSS, images, and links work either way; use a local server for a complete preview.
 
 == Changelog ==
+
+= 1.1.3 =
+* Fixed: pages with a multibyte (e.g. Japanese) slug are now written to disk under their real decoded name (テスト/index.html) instead of a literal percent-encoded name (%E3%83%86…/index.html), while links keep the percent-encoded form. A browser or web server decodes an href before it looks for the file, so the previous literal name only matched when a URL was double-encoded: such pages opened by double-click but broke when reached through their own link (and were silently served by WordPress when the export happened to sit inside a live site). Assets already followed this rule; pages now match. The link audit decodes links before checking the filesystem so it does not report false broken links.
+
+= 1.1.2 =
+* Changed: the Markdown export (content.md) is now streamed one page at a time instead of collecting every page's text and joining it at the end. On sites with a very large number of pages this keeps memory flat and stops the job data from growing with page count, the same way binary assets were made stream-copied in 1.1.1. The output file is byte-for-byte identical to before.
 
 = 1.1.1 =
 * Changed: binary assets (images, PDFs, fonts, video) are now stream-copied instead of read fully into memory, so large files no longer inflate memory during generation. Stylesheets are still read in memory because their url() references are rewritten.

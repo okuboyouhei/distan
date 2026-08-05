@@ -213,6 +213,40 @@ class Distan_Paths {
 	}
 
 	/**
+	 * Append text to a file in the output root, creating it if needed.
+	 *
+	 * Used for the Markdown export, which is built up one page at a time
+	 * across batches so the whole document is never held in memory (nor
+	 * carried in the job transient) the way concatenating every page first
+	 * would require. Same containment guarantees as write().
+	 *
+	 * @param string $relative Output-relative path.
+	 * @param string $contents Text to append.
+	 */
+	public static function append( string $relative, string $contents ): bool {
+		$absolute = self::resolve_output( $relative );
+
+		if ( null === $absolute ) {
+			return false;
+		}
+
+		if ( ! self::ensure_dir( self::output_root() ) ) {
+			return false;
+		}
+
+		if ( ! self::ensure_dir( dirname( $absolute ) ) ) {
+			return false;
+		}
+
+		// Final containment check, immediately before the write.
+		if ( ! self::is_contained( $absolute ) ) {
+			return false;
+		}
+
+		return false !== file_put_contents( $absolute, $contents, FILE_APPEND | LOCK_EX ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+	}
+
+	/**
 	 * Stream-copy a source file into the output root without loading the
 	 * whole file into memory. Used for binary assets (images, PDFs, fonts,
 	 * video) whose contents are not rewritten. Returns false on any doubt.

@@ -46,7 +46,7 @@ class Distan_Generator {
 			'written'     => array(),
 			'assets'      => array(),
 			'errors'      => array(),
-			'md_sections' => array(),
+			'md_started'  => false,
 			'started'     => time(),
 		);
 
@@ -95,7 +95,15 @@ class Distan_Generator {
 			}
 
 			if ( ! empty( $result['md_section'] ) ) {
-				$job['md_sections'][] = $result['md_section'];
+				// Stream the page straight to content.md rather than holding
+				// every section in the job transient until the end. md_started
+				// only flips once a section has actually reached disk, so a
+				// failed first write is retried (header and all) on the next
+				// page instead of appending a headerless body.
+				if ( Distan_Markdown::append_section( $result['md_section'], empty( $job['md_started'] ) ) ) {
+					$job['md_started'] = true;
+					$job['md_written'] = true;
+				}
 			}
 		}
 
@@ -107,9 +115,9 @@ class Distan_Generator {
 			$job['large_files']   = $assets_result['large_files'];
 			$job['broken']        = self::audit_links( $job['written'] );
 
-			if ( Distan_Markdown::is_enabled() && ! empty( $job['md_sections'] ) ) {
-				$job['md_written'] = Distan_Markdown::write( $job['md_sections'] );
-			}
+			// The Markdown export (content.md) was streamed page by page during
+			// the batches, so nothing is assembled here — $job['md_written']
+			// already reflects whether any section reached disk.
 
 			// Write sitemap.xml / robots.txt before the development-URL audit
 			// so any leftover development host in them (e.g. when the
@@ -481,14 +489,17 @@ class Distan_Generator {
 					continue;
 				}
 
-				// Files are written with percent-encoded names (multibyte slugs
-				// stay encoded on disk), and links carry the same encoded form.
-				// Match against the encoded path as-is; decoding here would look
-				// for a decoded name that does not exist and report a false
-				// broken link.
+				// Files are written under their real (decoded) name, while the
+				// href carries the percent-encoded form. Decode the link before
+				// probing the filesystem so "%E3%83%86.../index.html" is matched
+				// against the actual "テスト/index.html" on disk; probing the
+				// encoded string would look for a literal "%E3%83%86..." name
+				// that no longer exists and report a false broken link.
+				$decoded_link = rawurldecode( $link );
+
 				$target = $absolute_target
-					? self::collapse( $root . '/' . $link )
-					: self::collapse( $dir . '/' . $link );
+					? self::collapse( $root . '/' . $decoded_link )
+					: self::collapse( $dir . '/' . $decoded_link );
 
 				if ( file_exists( $target ) ) {
 					continue;

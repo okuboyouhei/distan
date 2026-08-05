@@ -83,16 +83,53 @@ final class Distan_Markdown {
 	}
 
 	/**
-	 * Build the full Markdown document from collected sections and write it.
+	 * Append one extracted page to the Markdown export, writing the document
+	 * header first on the opening call.
 	 *
-	 * @param array<int, array{title: string, url: string, body: string}> $sections Collected page sections.
-	 * @return bool True when written.
+	 * The export is streamed one page at a time instead of concatenating every
+	 * page into a single string at the end. A site with a huge number of pages
+	 * therefore never has to hold the whole document (several copies over) in
+	 * memory, and the job transient never has to carry every page's body
+	 * between batches. The resulting file is byte-for-byte identical to the
+	 * old buffered build, because to_public_urls() is a plain replacement with
+	 * no matches spanning section boundaries.
+	 *
+	 * @param array{title: string, url: string, body: string} $section  One extracted page.
+	 * @param bool                                             $is_first True for the first section of a run: the file is truncated and the header is written before the section, so a re-run never appends onto a previous run's file.
+	 * @return bool True when the section reached disk.
 	 */
-	public static function write( array $sections ): bool {
-		if ( empty( $sections ) ) {
-			return false;
+	public static function append_section( array $section, bool $is_first ): bool {
+		$block = self::render_section( $section );
+
+		// The blocks carry development URLs (as the pages rendered them). The
+		// delivered content.md swaps them for production URLs; the optional
+		// content.local.md keeps the development URLs for the data owner.
+		if ( $is_first ) {
+			$opening = self::render_header() . $block;
+
+			$public_ok = Distan_Paths::write( self::FILENAME, Distan_Urls::to_public_urls( $opening ) );
+
+			if ( self::wants_local_copy() ) {
+				Distan_Paths::write( self::FILENAME_LOCAL, $opening );
+			}
+
+			return $public_ok;
 		}
 
+		$public_ok = Distan_Paths::append( self::FILENAME, Distan_Urls::to_public_urls( $block ) );
+
+		if ( self::wants_local_copy() ) {
+			Distan_Paths::append( self::FILENAME_LOCAL, $block );
+		}
+
+		return $public_ok;
+	}
+
+	/**
+	 * The document header: site name, optional description, and a generated
+	 * marker. Written once, before the first section.
+	 */
+	private static function render_header(): string {
 		$site_name = wp_strip_all_tags( (string) get_bloginfo( 'name' ) );
 		$site_desc = wp_strip_all_tags( (string) get_bloginfo( 'description' ) );
 
@@ -110,33 +147,32 @@ final class Distan_Markdown {
 		);
 		$lines[] = '';
 
-		foreach ( $sections as $section ) {
-			$heading = '' !== $section['title'] ? $section['title'] : $section['url'];
+		return implode( "\n", $lines ) . "\n";
+	}
 
-			$lines[] = '---';
+	/**
+	 * Render one extracted page as its Markdown block: a divider, the heading,
+	 * an optional URL line, the body, and the trailing blank line that
+	 * separates it from the next section.
+	 *
+	 * @param array{title: string, url: string, body: string} $section One extracted page.
+	 */
+	private static function render_section( array $section ): string {
+		$heading = '' !== $section['title'] ? $section['title'] : $section['url'];
+
+		$lines   = array();
+		$lines[] = '---';
+		$lines[] = '';
+		$lines[] = '## ' . $heading;
+		if ( '' !== $section['url'] ) {
 			$lines[] = '';
-			$lines[] = '## ' . $heading;
-			if ( '' !== $section['url'] ) {
-				$lines[] = '';
-				$lines[] = 'URL: ' . $section['url'];
-			}
-			$lines[] = '';
-			$lines[] = $section['body'];
-			$lines[] = '';
+			$lines[] = 'URL: ' . $section['url'];
 		}
+		$lines[] = '';
+		$lines[] = $section['body'];
+		$lines[] = '';
 
-		$document = implode( "\n", $lines ) . "\n";
-
-		// The document is built with development URLs (as the pages rendered
-		// them). The delivered version swaps them for production URLs; the
-		// optional .local.md keeps the development URLs for the data owner.
-		$public_ok = Distan_Paths::write( self::FILENAME, Distan_Urls::to_public_urls( $document ) );
-
-		if ( self::wants_local_copy() ) {
-			Distan_Paths::write( self::FILENAME_LOCAL, $document );
-		}
-
-		return $public_ok;
+		return implode( "\n", $lines ) . "\n";
 	}
 
 	/**
