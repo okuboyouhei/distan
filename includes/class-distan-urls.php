@@ -725,7 +725,22 @@ class Distan_Urls {
 		return (string) preg_replace_callback(
 			'#' . $base . '[^"\'\s\\\\]*#',
 			static function ( $matches ) use ( $prefix ) {
-				return self::convert_single( $matches[0], $prefix );
+				$address = self::convert_single( $matches[0], $prefix );
+
+				// Unlike href/src, an import map address that is a relative URL
+				// must begin with "/", "./" or "../"; a bare "wp-includes/..."
+				// is read as a bare module specifier and rejected as a null
+				// value (breaking every module import on the page). On a
+				// top-level page the document-relative prefix is empty, so keep
+				// the address a valid relative URL. Absolute and deeper paths
+				// (scheme, "/", "../") already satisfy this and are untouched.
+				if ( '' !== $address
+					&& ! preg_match( '#^([a-z][a-z0-9+.\-]*:|/|\./|\.\./)#i', $address )
+				) {
+					$address = './' . $address;
+				}
+
+				return $address;
 			},
 			$text
 		);
