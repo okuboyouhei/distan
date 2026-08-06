@@ -28,6 +28,32 @@ class Distan_Ajax {
 	public function start(): void {
 		$this->guard();
 
+		// Refuse to start a second run over the first. The job and the output
+		// directory are shared (a single transient, a single dist folder), so
+		// two overlapping generations corrupt each other's progress and files.
+		$running = Distan_Generator::running_job();
+
+		if ( null !== $running ) {
+			$user  = get_userdata( (int) ( $running['user_id'] ?? 0 ) );
+			$who   = ( $user && '' !== $user->display_name )
+				? $user->display_name
+				: __( '別のユーザー', 'distan' );
+			$since = isset( $running['started'] )
+				? wp_date( 'H:i', (int) $running['started'] )
+				: '';
+
+			wp_send_json_error(
+				array(
+					'message' => '' !== $since
+						/* translators: 1: user who started the run, 2: start time */
+						? sprintf( __( '%1$s が生成を実行中です（開始 %2$s）。完了を待ってから、もう一度お試しください。', 'distan' ), $who, $since )
+						/* translators: %s: user who started the run */
+						: sprintf( __( '%s が生成を実行中です。完了を待ってから、もう一度お試しください。', 'distan' ), $who ),
+				),
+				409
+			);
+		}
+
 		$env = Distan_Env::run_all();
 
 		if ( ! Distan_Env::is_usable( $env ) ) {

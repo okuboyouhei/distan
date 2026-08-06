@@ -48,11 +48,53 @@ class Distan_Generator {
 			'errors'      => array(),
 			'md_started'  => false,
 			'started'     => time(),
+			'heartbeat'   => time(),
+			'user_id'     => get_current_user_id(),
 		);
 
 		set_transient( self::JOB_KEY, $job, HOUR_IN_SECONDS );
 
 		return self::public_state( $job );
+	}
+
+	/**
+	 * Seconds after which a run with no heartbeat is treated as dead.
+	 *
+	 * A live run refreshes its heartbeat every batch, so this only needs to
+	 * exceed the time one batch can take. It must be generous enough that a
+	 * slow batch (several page fetches) is never mistaken for a crash, hence
+	 * the two-minute default; filterable for very slow sites.
+	 */
+	public static function stale_after(): int {
+		return (int) apply_filters( 'distan_job_stale_after', 120 );
+	}
+
+	/**
+	 * The in-progress job, or null if none is running.
+	 *
+	 * A finished run deletes its transient, so any live job array means a run
+	 * is in progress — unless its heartbeat has gone stale (the browser was
+	 * closed mid-run), in which case it is treated as abandoned and a new run
+	 * is allowed to take over. Used to keep two people (or two tabs) from
+	 * starting overlapping generations against the single shared job and
+	 * output directory.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	public static function running_job(): ?array {
+		$job = get_transient( self::JOB_KEY );
+
+		if ( ! is_array( $job ) ) {
+			return null;
+		}
+
+		$heartbeat = isset( $job['heartbeat'] ) ? (int) $job['heartbeat'] : (int) ( $job['started'] ?? 0 );
+
+		if ( ( time() - $heartbeat ) > self::stale_after() ) {
+			return null;
+		}
+
+		return $job;
 	}
 
 	/**
@@ -70,6 +112,10 @@ class Distan_Generator {
 				'message' => __( '進行中のジョブが見つかりません。もう一度開始してください。', 'distan' ),
 			);
 		}
+
+		// Keep the run's heartbeat fresh so running_job() sees it as alive.
+		// It is written back with the job below (or cleared on completion).
+		$job['heartbeat'] = time();
 
 		$size = max( 1, min( 20, $size ) );
 		$end  = min( $job['index'] + $size, $job['total'] );

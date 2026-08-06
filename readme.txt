@@ -4,7 +4,7 @@ Tags: static site generator, static, export, html, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.1.4
+Stable tag: 1.1.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -64,6 +64,9 @@ Anything that needs server-side processing: search forms, comment submission, co
 Yes, with a classic theme. Block themes load their JavaScript as ES modules, which browsers refuse to load over `file://`. HTML, CSS, images, and links work either way; use a local server for a complete preview.
 
 == Changelog ==
+
+= 1.1.5 =
+* Added: a guard against two people (or two browser tabs) starting a generation at the same time. Progress and output are tracked in a single shared job and written to one output directory, so overlapping runs previously corrupted each other. Starting a run while one is already in progress is now refused with a message naming who started it and when. A run that was abandoned mid-way (browser closed) is detected as stale after a couple of minutes (filter distan_job_stale_after) so it never blocks future runs.
 
 = 1.1.4 =
 * Fixed: on top-level pages, the import map address for block-theme modules (e.g. @wordpress/interactivity, used by the navigation block) was written as a bare relative path (wp-includes/…) with no ./ prefix. An import map address that is a relative URL must start with /, ./ or ../, so browsers treated the bare form as a null value and every module import on the page failed ("Failed to resolve module specifier … blocked by a null value"). Deeper pages already got a ../ prefix and worked; top-level pages now get ./ so interactive block-theme features work in relative-link mode too. Sites delivered with an absolute public URL were unaffected.
