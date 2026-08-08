@@ -156,6 +156,11 @@ class Distan_Generator {
 		$done = $job['index'] >= $job['total'];
 
 		if ( $done ) {
+			// Bundle any explicitly-listed extra files (distan_extra_assets)
+			// that no page links to, through the same copy pipeline so they
+			// are flattened, recorded in the manifest, and kept by the cleanup.
+			$job['assets'] = array_merge( $job['assets'], Distan_Urls::extra_assets() );
+
 			$assets_result        = self::copy_assets( $job['assets'] );
 			$job['assets_copied'] = $assets_result['copied'];
 			$job['large_files']   = $assets_result['large_files'];

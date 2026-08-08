@@ -1,22 +1,28 @@
 === Distan ===
 Contributors: youheiokubo
-Tags: static site generator, static, export, html, deploy
+Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.1.5
+Stable tag: 1.1.6
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
-Author in WordPress, deliver static HTML. A static site generator built for handing over HTML files, not a CMS.
+Author in WordPress, deliver static HTML — built for handing over files, not a CMS. No database, and no deploy credentials, in the deliverable.
 
 == Description ==
 
 Distan turns WordPress into a build environment for static HTML deliverables. You author in WordPress, then export clean, self-contained HTML that runs anywhere. No WordPress, no PHP, and no database are required on the production server.
 
-Unlike static export plugins that mirror a live WordPress site, Distan is built for the case where the HTML files themselves are the deliverable. WordPress stays on the developer's side and is never published. When an update is needed, you edit in WordPress, regenerate, and hand over the difference.
+Most static-export plugins mirror a *live* WordPress site and keep it running behind the scenes. Distan is built for the opposite case: the HTML files themselves are the deliverable, and WordPress stays on the developer's side and is never published. When an update is needed, you edit in WordPress, regenerate, and hand over the difference. (We think of it as "headloss": the head — the static HTML — goes to production, while the body — WordPress — stays in the workshop.)
 
-This suits agencies that deliver HTML files rather than a CMS — for example recruitment sites placed under a subdirectory of an existing corporate site, where adding a WordPress install is not an option.
+This suits people who deliver *files*, not a CMS — for example a recruitment site placed under a subdirectory of an existing corporate site, where adding another WordPress install is not an option.
+
+**How Distan is different**
+
+* **It does not deploy for you, and holds no credentials.** Distan writes files and stops there. Deployment is wired through hooks (`distan_after_generate`, `distan_dispatch`), so you connect your own rsync, git push, FTP, or CI. Nothing to trust with your server keys.
+* **It enumerates, it does not crawl.** Distan generates the pages WordPress already knows about, rather than spidering links. The result is predictable and light — no queue, no database tables, no build daemon.
+* **It stays small.** No bundled framework, no vendor tree, no schema migrations. Easy to read, easy to audit, and nothing left behind when you remove it.
 
 **What it does**
 
@@ -25,6 +31,9 @@ This suits agencies that deliver HTML files rather than a CMS — for example re
 * Flattens WordPress paths: theme files move to `assets/`, uploads move to `media/`. The `wp-content` directory disappears from the deliverable.
 * Cleans the HTML: removes the generator tag, REST API links, oEmbed, emoji scripts, speculative loading rules, and the development `noindex`.
 * Keeps cache-busting query strings on assets, so file names stay stable and can be overwritten over FTP.
+* Optional `sitemap.xml` and a minimal `robots.txt`, built from the pages actually generated, using the production URL.
+* Optional Markdown export (`content.md`) that combines every page's main content into one file — handy for feeding a site into AI tools (Gemini Notebook / NotebookLM, and similar).
+* Optionally bundle extra files or directories that nothing links to (`distan_extra_assets`) — for assets referenced only from inside a script, such as a JSON file fetched by JavaScript.
 * Reports a diff after each run: which files were added, and which need to be removed from production.
 * Audits links and reports any whose target was not generated.
 * Downloads the result as a ZIP.
@@ -35,7 +44,7 @@ The only hard requirement is loopback HTTP (the site being able to request itsel
 
 **Not for every case**
 
-Distan is not suitable when the client updates the site themselves, when forms, search, comments, or membership are required, or for sites of only a few pages.
+Distan is not suitable when the client updates the site themselves, when forms, search, comments, or membership are required, or for sites of only a few pages. If you need built-in deployment to many destinations, scheduled or change-based publishing, or managed static hosting, a larger tool such as Simply Static or Staatic will fit better.
 
 == Installation ==
 
@@ -51,6 +60,10 @@ The output is written to `wp-content/uploads/distan/dist/`.
 
 No. The output is static HTML. That is the point: there is no application to attack or maintain on the production server.
 
+= How do I deploy the result? =
+
+Distan does not deploy for you and never stores server credentials. It fires `distan_after_generate` when a run finishes, and an optional `distan_dispatch` action when you press the deploy button after reviewing the output. Hook either one to your own rsync, git push, FTP, or CI step. You can also just download the ZIP.
+
 = Do template functions work? =
 
 Yes. Generation sends a normal HTTP request per page, so `get_header()`, `get_template_part()`, template hierarchy, conditional tags, and custom fields all behave exactly as they do on the live site.
@@ -59,11 +72,26 @@ Yes. Generation sends a normal HTTP request per page, so `get_header()`, `get_te
 
 Anything that needs server-side processing: search forms, comment submission, contact forms, and membership. Values that depend on the current time (a copyright year printed with `date('Y')`, relative dates) are frozen at generation time.
 
+= A script fetches a file (e.g. JSON) that is not being copied. Why? =
+
+Distan collects assets by reading the generated HTML and CSS, so a path built inside a script — `fetch('../assets/json/data.json')` — is invisible to it and the file is left out. List the file or directory with the `distan_extra_assets` filter to bundle it anyway; its path is flattened the same way as other theme assets, so the relative fetch keeps working.
+
+= Can I export the content for AI tools? =
+
+Yes. Enable the Markdown export and Distan writes `content.md`, combining every page's main content into one file with production URLs — ready to hand to an AI notebook or a retrieval index. An optional `content.local.md` keeps development URLs.
+
 = Can I open the generated files directly? =
 
 Yes, with a classic theme. Block themes load their JavaScript as ES modules, which browsers refuse to load over `file://`. HTML, CSS, images, and links work either way; use a local server for a complete preview.
 
+= Does it work with block (Full Site Editing) themes? =
+
+Yes. Classic and block themes are both supported, including the block navigation's interactivity, importmap paths, and module files.
+
 == Changelog ==
+
+= 1.1.6 =
+* Added: the distan_extra_assets filter, to bundle files or directories that no page links to. Distan collects assets by inspecting the generated HTML and CSS, so a file referenced only from inside a script (for example fetch('../assets/json/data.json')) is not found and is left out. Listing a file or directory here includes it anyway, through the same pipeline as linked assets: the theme (and uploads) path is flattened the same way, so a script that fetches a relative path keeps working; the file is recorded in the report and is never removed by the cleanup; executable extensions are still refused; and anything resolving outside the WordPress root is skipped. URLs inside these files are not rewritten, so they suit data files such as JSON. The default remains reference-based — nothing extra is copied unless you list it.
 
 = 1.1.5 =
 * Added: a guard against two people (or two browser tabs) starting a generation at the same time. Progress and output are tracked in a single shared job and written to one output directory, so overlapping runs previously corrupted each other. Starting a run while one is already in progress is now refused with a message naming who started it and when. A run that was abandoned mid-way (browser closed) is detected as stale after a couple of minutes (filter distan_job_stale_after) so it never blocks future runs.

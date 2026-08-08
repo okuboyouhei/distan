@@ -758,9 +758,26 @@ class Distan_Urls {
 			return;
 		}
 
-		// Never copy anything executable into a deliverable. wp-comments-post.php
-		// arrives here via the comment form's action attribute; a static site
-		// has no use for it and the client should not receive PHP.
+		if ( self::is_blocked_asset( $target ) ) {
+			return;
+		}
+
+		$source = self::source_for( $target );
+
+		if ( null === $source ) {
+			return;
+		}
+
+		self::$asset_queue[ $target ] = $source;
+	}
+
+	/**
+	 * Whether an output path has an extension we never copy into a
+	 * deliverable. wp-comments-post.php arrives here via a comment form's
+	 * action attribute; a static site has no use for PHP (or other
+	 * executables) and the client should not receive them.
+	 */
+	private static function is_blocked_asset( string $target ): bool {
 		$ext = strtolower( (string) pathinfo( $target, PATHINFO_EXTENSION ) );
 
 		$blocked = array( 'php', 'phtml', 'php3', 'php4', 'php5', 'php7', 'phps', 'phar', 'htaccess', 'cgi', 'pl', 'py', 'sh' );
@@ -772,17 +789,164 @@ class Distan_Urls {
 		 */
 		$blocked = (array) apply_filters( 'distan_blocked_extensions', $blocked );
 
-		if ( in_array( $ext, $blocked, true ) ) {
-			return;
+		return in_array( $ext, $blocked, true );
+	}
+
+	/**
+	 * Files to bundle into the output regardless of whether anything links to
+	 * them, declared via the distan_extra_assets filter.
+	 *
+	 * Some references can't be found by inspecting the HTML and CSS — a path
+	 * built inside a script (fetch('../assets/json/x.json')), a web app
+	 * manifest, and so on. Listing a file or directory here bundles it anyway,
+	 * while the default stays reference-based.
+	 *
+	 * These ride the same pipeline as linked assets: the theme (and uploads)
+	 * prefix is flattened the same way, so a theme's assets/json/x.json lands
+	 * at assets/json/x.json and a script fetching ../assets/json/x.json keeps
+	 * working; the result is recorded in the manifest, so it appears in the
+	 * diff report and the cleanup never removes it; and executable extensions
+	 * are refused. URLs *inside* these files are not rewritten (Distan rewrites
+	 * only HTML and CSS), so they suit data files such as JSON rather than
+	 * files that embed the development domain.
+	 *
+	 * Paths may be absolute, or relative to the active theme (stylesheet
+	 * directory, then template directory). A directory is included recursively.
+	 * Anything resolving outside the WordPress root is skipped.
+	 *
+	 * @return array<string, string> Output-relative path => absolute source path.
+	 */
+	public static function extra_assets(): array {
+		/**
+		 * Filter the list of extra files/directories to bundle wholesale.
+		 *
+		 * @param array<int, string> $paths File or directory paths, absolute or
+		 *                                   relative to the active theme.
+		 */
+		$paths = (array) apply_filters( 'distan_extra_assets', array() );
+
+		$out = array();
+
+		foreach ( $paths as $path ) {
+			foreach ( self::resolve_extra_sources( (string) $path ) as $source ) {
+				$target = self::asset_output_path( $source );
+
+				if ( null === $target || self::is_blocked_asset( $target ) ) {
+					continue;
+				}
+
+				$out[ $target ] = $source;
+			}
 		}
 
-		$source = self::source_for( $target );
+		return $out;
+	}
 
-		if ( null === $source ) {
-			return;
+	/**
+	 * Resolve one distan_extra_assets entry to a list of existing source files,
+	 * all contained within the WordPress root (no traversal or symlink escape).
+	 *
+	 * @return array<int, string> Absolute file paths.
+	 */
+	private static function resolve_extra_sources( string $path ): array {
+		if ( '' === $path ) {
+			return array();
 		}
 
-		self::$asset_queue[ $target ] = $source;
+		$root  = Distan_Paths::normalize( untrailingslashit( ABSPATH ) );
+		$bases = array();
+
+		if ( self::is_absolute_path( $path ) ) {
+			$bases[] = Distan_Paths::normalize( $path );
+		} else {
+			foreach ( array( get_stylesheet_directory(), get_template_directory() ) as $dir ) {
+				$bases[] = Distan_Paths::normalize( untrailingslashit( (string) $dir ) . '/' . ltrim( $path, '/' ) );
+			}
+		}
+
+		foreach ( $bases as $base ) {
+			$real = realpath( $base );
+
+			if ( false === $real ) {
+				continue;
+			}
+
+			$real = Distan_Paths::normalize( $real );
+
+			// Stay inside the WordPress root.
+			if ( $real !== $root && ! str_starts_with( $real, $root . '/' ) ) {
+				continue;
+			}
+
+			if ( is_file( $real ) ) {
+				return array( $real );
+			}
+
+			if ( is_dir( $real ) ) {
+				return self::list_files( $real, $root );
+			}
+		}
+
+		return array();
+	}
+
+	/**
+	 * Every file under a directory, restricted to the WordPress root.
+	 *
+	 * @return array<int, string> Absolute file paths.
+	 */
+	private static function list_files( string $dir, string $root ): array {
+		$files = array();
+
+		$iterator = new RecursiveIteratorIterator(
+			new RecursiveDirectoryIterator( $dir, FilesystemIterator::SKIP_DOTS ),
+			RecursiveIteratorIterator::LEAVES_ONLY
+		);
+
+		foreach ( $iterator as $file ) {
+			if ( ! $file->isFile() ) {
+				continue;
+			}
+
+			$real = realpath( $file->getPathname() );
+
+			if ( false === $real ) {
+				continue;
+			}
+
+			$real = Distan_Paths::normalize( $real );
+
+			if ( str_starts_with( $real, $root . '/' ) ) {
+				$files[] = $real;
+			}
+		}
+
+		return $files;
+	}
+
+	/**
+	 * Output-relative path for an absolute source inside the WordPress root,
+	 * flattened the same way linked assets are (theme -> its own root, uploads
+	 * -> media/). Returns null for anything outside the root.
+	 */
+	private static function asset_output_path( string $source ): ?string {
+		$root = Distan_Paths::normalize( untrailingslashit( ABSPATH ) );
+		$src  = Distan_Paths::normalize( $source );
+
+		if ( $src === $root || ! str_starts_with( $src, $root . '/' ) ) {
+			return null;
+		}
+
+		$relative = ltrim( substr( $src, strlen( $root ) ), '/' );
+
+		return self::remap_asset( $relative );
+	}
+
+	/**
+	 * Whether a path is absolute (Unix "/" or a Windows drive letter).
+	 */
+	private static function is_absolute_path( string $path ): bool {
+		return str_starts_with( $path, '/' ) || (bool) preg_match( '#^[A-Za-z]:[\\\\/]#', $path );
 	}
 
 	/**
