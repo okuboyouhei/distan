@@ -258,8 +258,14 @@ class Distan_Admin {
 				<?php esc_html_e( 'WordPress で作ったページを、納品できる静的HTMLとして書き出します。出力内容はテーマの出力に従うため、納品前に実物を確認してください。', 'distan' ); ?>
 			</p>
 
+			<nav class="distan-subnav" aria-label="<?php esc_attr_e( 'ページ内ナビゲーション', 'distan' ); ?>">
+				<a href="#distan-env" :class="{ 'is-active': active === 'env' }"><?php esc_html_e( '環境', 'distan' ); ?></a>
+				<a href="#distan-generate" :class="{ 'is-active': active === 'gen' }"><?php esc_html_e( '生成', 'distan' ); ?></a>
+				<a href="#distan-settings" :class="{ 'is-active': active === 'settings' }"><?php esc_html_e( '設定', 'distan' ); ?></a>
+			</nav>
+
 			<!-- Environment -->
-			<section class="hgp-card">
+			<section class="hgp-card" id="distan-env">
 				<div class="hgp-card__head">
 					<h2><?php esc_html_e( '環境', 'distan' ); ?></h2>
 					<button type="button" class="button" @click="runEnvCheck()" :disabled="envLoading">
@@ -293,7 +299,7 @@ class Distan_Admin {
 			</section>
 
 			<!-- Generate -->
-			<section class="hgp-card">
+			<section class="hgp-card" id="distan-generate">
 				<div class="hgp-card__head">
 					<h2><?php esc_html_e( '生成', 'distan' ); ?></h2>
 					<div class="hgp-card__actions">
@@ -467,7 +473,7 @@ class Distan_Admin {
 			</section>
 
 			<!-- Settings -->
-			<section class="hgp-card">
+			<section class="hgp-card" id="distan-settings">
 				<form method="post" action="options.php">
 					<?php settings_fields( 'distan_settings_group' ); ?>
 

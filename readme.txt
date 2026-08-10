@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.1.7
+Stable tag: 1.1.8
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -89,6 +89,9 @@ Yes, with a classic theme. Block themes load their JavaScript as ES modules, whi
 Yes. Classic and block themes are both supported, including the block navigation's interactivity, importmap paths, and module files.
 
 == Changelog ==
+
+= 1.1.8 =
+* Added: a sticky in-page navigation bar on the Distan admin screen. It follows the page as you scroll and jumps to the environment / generate / settings sections, with the current section highlighted as you move through them. This is admin-only UI — nothing in the generated output changes.
 
 = 1.1.7 =
 * Added: provenance on every generated entry. Each page now records what produced it (the post and its ID, the taxonomy term, the archive page), so the generation report names a change — for example "記事タイトル [投稿 #123]" — instead of only its file path. Removed pages keep their label, carried forward from the previous run. This is descriptive only: nothing is skipped or cached, and every page is still rendered on every run.

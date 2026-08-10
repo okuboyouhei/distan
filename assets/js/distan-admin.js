@@ -49,6 +49,37 @@
 			dispatching: false,
 			dispatchError: '',
 
+			active: 'env',
+
+			init: function () {
+				var self = this;
+
+				if ( typeof window.IntersectionObserver !== 'function' ) {
+					return;
+				}
+
+				var map = {
+					'distan-env': 'env',
+					'distan-generate': 'gen',
+					'distan-settings': 'settings'
+				};
+
+				var observer = new window.IntersectionObserver( function ( entries ) {
+					entries.forEach( function ( entry ) {
+						if ( entry.isIntersecting && map[ entry.target.id ] ) {
+							self.active = map[ entry.target.id ];
+						}
+					} );
+				}, { rootMargin: '-30% 0px -60% 0px', threshold: 0 } );
+
+				Object.keys( map ).forEach( function ( id ) {
+					var el = document.getElementById( id );
+					if ( el ) {
+						observer.observe( el );
+					}
+				} );
+			},
+
 			percent: function () {
 				if ( ! this.genTotal ) {
 					return 0;

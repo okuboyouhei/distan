@@ -435,3 +435,60 @@
 	min-height: 34px;
 	font-size: 14px;
 }
+
+/* --- Sticky section nav (追従ナビ) --- */
+/* Smooth in-page jumps. Scoped to this admin page (this stylesheet only
+   loads on the Distan screen), so it does not affect other admin pages. */
+html {
+	scroll-behavior: smooth;
+}
+
+.distan-subnav {
+	position: sticky;
+	top: 32px; /* WordPress admin bar height (desktop) */
+	z-index: 10;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 2px;
+	margin: 16px 0;
+	padding: 4px;
+	background: var(--dsp-panel);
+	border: 1px solid var(--dsp-line);
+	border-radius: 2px;
+}
+
+.distan-subnav a {
+	padding: 6px 14px;
+	color: var(--dsp-slate);
+	text-decoration: none;
+	border-bottom: 2px solid transparent;
+	border-radius: 2px;
+}
+
+.distan-subnav a:hover,
+.distan-subnav a:focus {
+	color: var(--dsp-ink);
+	background: var(--dsp-ground);
+}
+
+.distan-subnav a.is-active {
+	color: var(--dsp-ink);
+	font-weight: 600;
+	border-bottom-color: var(--dsp-stamp);
+}
+
+/* Keep a jumped-to section heading clear of the admin bar + sticky nav. */
+.distan-wrap .hgp-card[id] {
+	scroll-margin-top: 84px;
+}
+
+@media screen and (max-width: 782px) {
+	/* On small screens the admin bar is not fixed; it scrolls away. */
+	.distan-subnav {
+		top: 0;
+	}
+
+	.distan-wrap .hgp-card[id] {
+		scroll-margin-top: 52px;
+	}
+}
