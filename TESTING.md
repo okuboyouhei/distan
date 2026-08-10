@@ -2,7 +2,7 @@
 
 リリース前と、大きな変更を加えたあとの動作確認手順です。毎回このとおりに実行します。
 
-対象バージョン: 0.9.17 / 出力先: `wp-content/uploads/distan/dist/`
+対象バージョン: 1.1.7 / 出力先: `wp-content/uploads/distan/dist/`
 
 ---
 
@@ -162,9 +162,90 @@ python3 -m http.server 8000
 - [ ] 投稿を 1 件削除して再生成 → 「本番から削除が必要なファイル」に出る
 - [ ] 出力ディレクトリから当該ファイルが**自動で消えている**
 
+### 9-1. 由来（provenance）ラベル ★1.1.7
+
+差分レポートの追加/削除行が、ファイルパスだけでなく**ラベル＋由来タグ**で出ることを確認します。
+
+- [ ] 生成 → 「差分レポート（.md）」の追加行が `ラベル [種別 #id]` 形式
+      （例: `フロントページ [フロントページ]` / タイトル `[投稿 #123]` / `News [タクソノミー #7]`）
+- [ ] 投稿を 1 件**タイトル変更**して再生成 → 差分にそのページがラベル付きで出る
+- [ ] 投稿を 1 件削除して再生成 → 「削除が必要」欄に**ラベル付き**で出る
+      （削除ページのラベルは前回マニフェストの `entries` から繰り越されます。壊れるとパスだけになります）
+
+```bash
+cd wp-content/uploads/distan/dist
+grep -nE '\[(投稿|タクソノミー|フロントページ|投稿アーカイブ|外部ソース)' distan-report.md | head
+```
+
 ---
 
-## 10. アンインストール
+## 10. 拡張ポイント（`distan_sources` / `distan_collect` / コアsitemap）★1.1.7
+
+フィルタを一時的に足して確認します。`wp-content/mu-plugins/distan-test.php` を作成:
+
+```php
+<?php
+// A) カスタム URL ソース（列挙が発見できない URL を第一級で追加）
+add_filter( 'distan_sources', function ( $providers ) {
+	$providers[] = function () {
+		return array(
+			Distan_Collector::make_item(
+				home_url( '/__test-virtual/' ),
+				'テスト仮想ページ',
+				array( 'kind' => 'extra', 'origin' => 'test' )
+			),
+		);
+	};
+	return $providers;
+} );
+
+// B) distan_collect でトップと衝突する URL を差し込む（上書き防止の確認）
+add_filter( 'distan_collect', function ( $queue ) {
+	$queue[] = Distan_Collector::make_item( home_url( '/' ), '衝突テスト', array( 'kind' => 'extra' ) );
+	return $queue;
+} );
+```
+
+### 10-1. distan_sources（カスタム URL）
+
+- [ ] 再生成 → 統計タイルの「出力ファイル」が 1 件増える
+- [ ] `dist/__test-virtual/index.html` が存在する
+- [ ] レポートに `[外部ソース]` で載る
+
+### 10-2. distan_collect の衝突（上書き防止＝1.1.7 の修正）
+
+- [ ] トップが「衝突テスト」で**上書きされていない**（built-in のフロントページが勝つ）
+- [ ] `index.html` が二重生成されていない
+
+```bash
+cd wp-content/uploads/distan/dist
+find . -name index.html | grep -c '^\./index.html$'   # 1 であること
+```
+
+### 10-3. コアsitemap 突き合わせ（診断・既定オン）
+
+- [ ] `/wp-sitemap.xml` がローカルで開ける（コアsitemap が有効）
+- [ ] 生成 → レポートに `## コア sitemap にあって未生成のURL` 節。既定除外の著者/日付や、プラグイン登録 URL があれば列挙される
+      （ギャップが無ければ節は出ない。それも正常）
+
+### 10-4. コアsitemap シード（選択制・既定オフ）
+
+```php
+add_filter( 'distan_use_core_sitemap', '__return_true' );
+```
+
+- [ ] 再生成 → コアsitemap の URL が列挙に合流して生成される／10-3 の「未生成」節が縮む・消える／重複生成が増えない
+- [ ] 確認後、この filter を外す
+
+### 10-5. 後片付け
+
+- [ ] `wp-content/mu-plugins/distan-test.php` を削除 → 最終クリーン生成
+- [ ] `wp-content/debug.log` に新規のワーニング/ノーティスが無い
+      （`make_item` の source、`provided_items`、`write_manifest` の `entries`、sitemap 監査は毎回走るため、ここは必ず確認）
+
+---
+
+## 11. アンインストール
 
 - [ ] プラグインを**削除**する
 - [ ] `distan_settings` などのオプションが DB から消えている

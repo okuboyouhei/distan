@@ -17,11 +17,14 @@ WordPress を制作環境として使い、納品用の静的 HTML を書き出�
 - **パス平坦化** — テーマ→`assets/`、uploads→`media/`、`wp-content` が消える
 - **キャッシュバスティング保持** — アセットのクエリ文字列（`?ver=filemtime` 等）をそのまま保持。ファイル名は不変なので FTP 上書きで更新できる
 - **差分レポート＋自動掃除＋差分 MD＋ZIP** — 再生成のたびに追加/変更/リンク切れを報告。出力先の掃除は自動、削除は報告のみ（本番には触れない）
+- **列挙の由来（provenance）** — 生成した各ページに由来（投稿とその ID／タクソノミー・ターム／アーカイブのページ番号など）を記録。差分レポートはファイルパスだけでなく「投稿タイトル [投稿 #123]」の形で変更を名指す。増分スキップはしない（毎回すべて再生成する）
 - **大きいファイルの検出と警告** — 画像・PDF・フォント・動画などバイナリはストリームコピー（メモリに全体を載せない）。一定サイズ超（既定 10MB、`distan_large_file_threshold` フィルタ）はレポートに一覧表示。コピーはするので手作業は不要（納品サイズや CDN 検討の目安）。CSS だけは url() 書き換えのためメモリに読む
 - **Markdown 書き出し（選択制）** — 全ページ本文を 1 ファイル `content.md` にまとめる。Gemini Notebook（旧NotebookLM）等の AI ツール向け。ページネーションは除外。URL は公開 URL に置換（開発用に `content.local.md` も選択可）
 - **サイトマップ書き出し（選択制）** — 生成したページから `sitemap.xml` を作る（Google Search Console 対応の標準形式）。URL は公開 URL。著者・日付アーカイブは収集対象外なので `?author=1` 等の ID は載らない。`/private/`（スラッグ以下）や `draft`（語を含む）で除外指定できる（設定 または `distan_sitemap_exclude` フィルタ）
 - **robots.txt 書き出し（選択制）** — 最小構成（`Allow: /`）。サイトマップが有効なときは `Sitemap:` 行も記載。既にサーバーに robots.txt がある場合はオフにする
 - **リンク監査** — 内部リンクの切れを検出して報告
+- **カスタム URL ソース** — `distan_sources` フィルタで、列挙が発見できない URL（プラグイン生成の経路・仮想ページ）を第一級で追加できる。`Distan_Collector::make_item()` で作り、重複排除の前に合流するので、追加 URL もカウント・差分・重複排除の対象になる（生の最終手段として `distan_collect` は残置）
+- **コアサイトマップ突き合わせ** — 生成後、WordPress コアの `wp-sitemap` をプロセス内で読み（HTTP なし・クロールなし）、コアが挙げているのに未生成の URL をレポートに一覧して網羅の穴を可視化する。`distan_use_core_sitemap` で、それらを補助ソースとして列挙に合流も可能（既定オフ。コアサイトマップは noindex を尊重し無効化もされうるため、置換ではなく補助扱い）
 - **生成完了フック** — `distan_after_generate`（アクション）で、生成後に任意のデプロイ処理（git push / rsync / Webhook 等）を繋げる。Distan 自体はデプロイしない・認証情報を持たない
 - **デプロイフック** — `distan_dispatch`（アクション）は、生成物を目視確認したあと手動の「デプロイ」ボタンを押したときだけ発火する。`distan_after_generate` が自動（生成のたびに必ず発火）なのに対し、`distan_dispatch` は人間のゲート。プレビュー配信は前者、本番へのデプロイは後者、と二層に分けられる。承認状態は持たず、最終デプロイ時刻（`distan_last_dispatch`）だけを記録する。ボタンは既定オフ、設定で有効化
 
@@ -38,7 +41,15 @@ WordPress を制作環境として使い、納品用の静的 HTML を書き出�
 
 ## 主なフィルタ
 
-`distan_taxonomies` `distan_post_types` `distan_collect` `distan_archive_max_pages` `distan_term_max_pages` `distan_404_probe` `distan_flatten_theme` `distan_uploads_dir` `distan_clean_html` `distan_clean_output` `distan_remove_global_styles` `distan_robots` `distan_head_actions` `distan_dequeue_handles` `distan_blocked_extensions` `distan_capability` `distan_url_replacements` `distan_markdown_region` `distan_sitemap_exclude` `distan_sitemap_entries` `distan_robots_lines` `distan_large_file_threshold`
+`distan_taxonomies` `distan_post_types` `distan_collect` `distan_archive_max_pages` `distan_term_max_pages` `distan_404_probe` `distan_flatten_theme` `distan_uploads_dir` `distan_clean_html` `distan_clean_output` `distan_remove_global_styles` `distan_robots` `distan_head_actions` `distan_dequeue_handles` `distan_blocked_extensions` `distan_capability` `distan_url_replacements` `distan_markdown_region` `distan_sitemap_exclude` `distan_sitemap_entries` `distan_robots_lines` `distan_large_file_threshold` `distan_sources` `distan_use_core_sitemap` `distan_sitemap_audit_max_pages`
+
+## 生成キューのエントリ形式
+
+`distan_sources`（登録）と `distan_collect`（最終手段）で扱うエントリの形。フィルタ境界を越えるので実質的な公開 API。
+
+- 形: `array{ url, path, label, type, source }`。`Distan_Collector::make_item( $url, $label, $source )` で作る（`path` は `url` から導出されるので手で埋めない）
+- `source.kind` の種類: `front` / `blog_home`（id）/ `blog_archive`（page）/ `post`（id, post_type）/ `term`（taxonomy, id, page）/ `not_found` / `extra`（origin）
+- 追加した URL は重複排除の前に合流し、カウント・差分・dedup の対象になる（`distan_collect` の生編集も直後にもう一度 dedup される）
 
 ## 前提・注意
 

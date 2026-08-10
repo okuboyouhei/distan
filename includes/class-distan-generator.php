@@ -186,7 +186,17 @@ class Distan_Generator {
 			}
 
 			$job['dev_urls'] = self::audit_dev_urls( $scan );
-			$job['cleaned']  = self::clean_output( $job );
+
+			// Coverage diagnostic: URLs WordPress core's own sitemap declares
+			// that this run did not enumerate. Advisory only — it names what a
+			// pure-enumeration pass may have missed (typically plugin-registered
+			// routes) so the omission is visible rather than silent, the same
+			// stance the link audit takes for generated output.
+			if ( class_exists( 'Distan_Sitemap_Audit' ) ) {
+				$job['sitemap_missing'] = Distan_Sitemap_Audit::missing_from( $job['queue'] );
+			}
+
+			$job['cleaned'] = self::clean_output( $job );
 
 			self::write_manifest( $job );
 
@@ -722,9 +732,14 @@ class Distan_Generator {
 	 * @param array<string, mixed> $job Job state.
 	 */
 	private static function write_manifest( array $job ): void {
-		$previous = get_option( self::MANIFEST_KEY, array() );
-		$previous = is_array( $previous ) && isset( $previous['files'] ) && is_array( $previous['files'] )
-			? $previous['files']
+		$previous_manifest = get_option( self::MANIFEST_KEY, array() );
+		$previous_manifest = is_array( $previous_manifest ) ? $previous_manifest : array();
+
+		$previous = isset( $previous_manifest['files'] ) && is_array( $previous_manifest['files'] )
+			? $previous_manifest['files']
+			: array();
+		$previous_entries = isset( $previous_manifest['entries'] ) && is_array( $previous_manifest['entries'] )
+			? $previous_manifest['entries']
 			: array();
 
 		$current = array_values( array_unique( array_merge(
@@ -732,12 +747,42 @@ class Distan_Generator {
 			array_keys( $job['assets'] )
 		) ) );
 
+		// Map each output path back to what produced it, so the diff can name a
+		// page ("投稿: タイトル") rather than only its file path. Assets have no
+		// queue entry and stay label-less. The queue has carried provenance
+		// since collection, so this is a lookup, not extra work.
+		$entries = array();
+		if ( isset( $job['queue'] ) && is_array( $job['queue'] ) ) {
+			foreach ( $job['queue'] as $item ) {
+				if ( ! is_array( $item ) || empty( $item['path'] ) ) {
+					continue;
+				}
+				$entries[ $item['path'] ] = array(
+					'label'  => isset( $item['label'] ) ? (string) $item['label'] : '',
+					'source' => isset( $item['source'] ) && is_array( $item['source'] ) ? $item['source'] : array(),
+				);
+			}
+		}
+
+		$removed = array_values( array_diff( $previous, $current ) );
+		$added   = array_values( array_diff( $current, $previous ) );
+
+		// Removed paths are gone from the current queue, so carry their label
+		// forward from last run's entries. That keeps the "must delete from
+		// production" list named rather than bare paths.
+		foreach ( $removed as $path ) {
+			if ( ! isset( $entries[ $path ] ) && isset( $previous_entries[ $path ] ) ) {
+				$entries[ $path ] = $previous_entries[ $path ];
+			}
+		}
+
 		update_option(
 			self::MANIFEST_KEY,
 			array(
 				'files'    => $current,
-				'removed'  => array_values( array_diff( $previous, $current ) ),
-				'added'    => array_values( array_diff( $current, $previous ) ),
+				'entries'  => $entries,
+				'removed'  => $removed,
+				'added'    => $added,
 				'broken'   => isset( $job['broken'] ) ? $job['broken'] : array(),
 				'cleaned'  => isset( $job['cleaned'] ) ? $job['cleaned'] : array(),
 				'dev_urls' => isset( $job['dev_urls'] ) ? $job['dev_urls'] : array(
@@ -746,6 +791,7 @@ class Distan_Generator {
 				),
 				'has_modules' => ! empty( $job['has_modules'] ),
 				'large_files' => isset( $job['large_files'] ) ? $job['large_files'] : array(),
+				'sitemap_missing' => isset( $job['sitemap_missing'] ) ? $job['sitemap_missing'] : array(),
 				'finished' => time(),
 			),
 			false

@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.1.6
+Stable tag: 1.1.7
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -89,6 +89,12 @@ Yes, with a classic theme. Block themes load their JavaScript as ES modules, whi
 Yes. Classic and block themes are both supported, including the block navigation's interactivity, importmap paths, and module files.
 
 == Changelog ==
+
+= 1.1.7 =
+* Added: provenance on every generated entry. Each page now records what produced it (the post and its ID, the taxonomy term, the archive page), so the generation report names a change — for example "記事タイトル [投稿 #123]" — instead of only its file path. Removed pages keep their label, carried forward from the previous run. This is descriptive only: nothing is skipped or cached, and every page is still rendered on every run.
+* Added: the distan_sources filter, a first-class way to register URLs that enumeration cannot discover on its own (plugin-generated routes, virtual pages). Entries are built with Distan_Collector::make_item(), merged before de-duplication, and carry provenance, so an added URL is counted and appears in the diff like any built-in page. This differs from distan_collect, which remains available for raw last-resort edits.
+* Fixed: a URL added through the distan_collect filter could collide with a built-in page's output path and silently overwrite it, because the filter ran after de-duplication. The queue is now de-duplicated once more after the filter, so a collision drops the later entry instead of overwriting an already-generated file.
+* Added: core-sitemap reconciliation. After a run, Distan reads WordPress core's own sitemap (wp-sitemap) in-process — no HTTP, no crawling — and lists in the report any URL the sitemap declares but the run did not generate, so a coverage gap is visible rather than silent. Optionally (filter distan_use_core_sitemap) those URLs can also seed the queue as a supplementary source; it stays a supplement, since core sitemaps honour noindex and can be disabled.
 
 = 1.1.6 =
 * Added: the distan_extra_assets filter, to bundle files or directories that no page links to. Distan collects assets by inspecting the generated HTML and CSS, so a file referenced only from inside a script (for example fetch('../assets/json/data.json')) is not found and is left out. Listing a file or directory here includes it anyway, through the same pipeline as linked assets: the theme (and uploads) path is flattened the same way, so a script that fetches a relative path keeps working; the file is recorded in the report and is never removed by the cleanup; executable extensions are still refused; and anything resolving outside the WordPress root is skipped. URLs inside these files are not rewritten, so they suit data files such as JSON. The default remains reference-based — nothing extra is copied unless you list it.

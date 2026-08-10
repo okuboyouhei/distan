@@ -26,7 +26,7 @@ class Distan_Collector {
 		$items = array();
 
 		// Front page.
-		$items[] = self::item( home_url( '/' ), __( 'フロントページ', 'distan' ) );
+		$items[] = self::item( home_url( '/' ), __( 'フロントページ', 'distan' ), array( 'kind' => 'front' ) );
 
 		// The 404 template. It has no real URL, so it is fetched by asking for
 		// one that cannot exist and saved to a fixed filename.
@@ -47,7 +47,7 @@ class Distan_Collector {
 		if ( $posts_page > 0 ) {
 			$permalink = get_permalink( $posts_page );
 			if ( $permalink ) {
-				$items[] = self::item( $permalink, get_the_title( $posts_page ) );
+				$items[] = self::item( $permalink, get_the_title( $posts_page ), array( 'kind' => 'blog_home', 'id' => $posts_page ) );
 			}
 		}
 
@@ -79,29 +79,127 @@ class Distan_Collector {
 					continue;
 				}
 
-				$items[] = self::item( $permalink, get_the_title( $id ) );
+				$items[] = self::item(
+					$permalink,
+					get_the_title( $id ),
+					array( 'kind' => 'post', 'id' => (int) $id, 'post_type' => $post_type )
+				);
 			}
+		}
+
+		// Custom sources (distan_sources). These declare URLs enumeration
+		// cannot know about — plugin-generated routes, virtual pages — and are
+		// merged in before dedup so they are deduplicated alongside the
+		// built-in enumeration and carry provenance. Unlike distan_collect,
+		// nothing spliced in here is second-class: it is counted and appears
+		// in the diff like anything else.
+		foreach ( self::provided_items() as $provided_item ) {
+			$items[] = $provided_item;
 		}
 
 		// Deduplicate by output path: two URLs mapping to one file would have
 		// the later one silently overwrite the earlier.
+		$unique = self::dedupe_by_path( $items );
+
+		/**
+		 * Filter the collected generation queue.
+		 *
+		 * Last-resort raw editing point. Prefer `distan_sources`, whose entries
+		 * are deduplicated and carry provenance; anything added here is
+		 * deduplicated once more below but is otherwise unvalidated.
+		 *
+		 * @param array<int, array{url: string, path: string, label: string, type: string, source: array<string, mixed>}> $unique Queue.
+		 */
+		$unique = (array) apply_filters( 'distan_collect', $unique );
+
+		// Dedup again: a raw distan_collect edit must not reintroduce a path
+		// collision that silently overwrites another page at write time.
+		return self::dedupe_by_path( $unique );
+	}
+
+	/**
+	 * Remove entries whose output path repeats, keeping the first seen.
+	 *
+	 * Empty paths (URLs that map to no file) are dropped. Non-array members,
+	 * which a careless distan_collect filter could introduce, are ignored
+	 * rather than fatal.
+	 *
+	 * @param array<int, mixed> $items Candidate entries.
+	 * @return array<int, array{url: string, path: string, label: string, type: string, source: array<string, mixed>}>
+	 */
+	private static function dedupe_by_path( array $items ): array {
 		$seen   = array();
 		$unique = array();
 
 		foreach ( $items as $item ) {
-			if ( '' === $item['path'] || isset( $seen[ $item['path'] ] ) ) {
+			if ( ! is_array( $item ) || empty( $item['path'] ) || isset( $seen[ $item['path'] ] ) ) {
 				continue;
 			}
 			$seen[ $item['path'] ] = true;
 			$unique[]              = $item;
 		}
 
+		return $unique;
+	}
+
+	/**
+	 * Entries contributed by custom sources on the `distan_sources` filter.
+	 *
+	 * A provider is any callable returning an array of entries built with
+	 * self::make_item(). Raw url/label/source arrays are accepted too and
+	 * normalised through make_item(), so a provider cannot inject an
+	 * inconsistent url/path pair.
+	 *
+	 * @return array<int, array{url: string, path: string, label: string, type: string, source: array<string, mixed>}>
+	 */
+	private static function provided_items(): array {
 		/**
-		 * Filter the collected generation queue.
+		 * Register custom URL sources.
 		 *
-		 * @param array<int, array{url: string, path: string, label: string}> $unique Queue.
+		 * @param array<int, callable> $providers Callables returning make_item() arrays.
 		 */
-		return (array) apply_filters( 'distan_collect', $unique );
+		$providers = (array) apply_filters( 'distan_sources', array() );
+
+		$items = array();
+
+		foreach ( $providers as $provider ) {
+			if ( ! is_callable( $provider ) ) {
+				continue;
+			}
+
+			foreach ( (array) call_user_func( $provider ) as $entry ) {
+				if ( ! is_array( $entry ) || empty( $entry['url'] ) ) {
+					continue;
+				}
+
+				$items[] = self::make_item(
+					(string) $entry['url'],
+					isset( $entry['label'] ) ? (string) $entry['label'] : __( '外部ソース', 'distan' ),
+					isset( $entry['source'] ) && is_array( $entry['source'] )
+						? $entry['source']
+						: array( 'kind' => 'extra' )
+				);
+			}
+		}
+
+		/**
+		 * Opt in to seeding the queue from WordPress core's own sitemap
+		 * providers (wp-sitemap). This pulls in URLs that plugins register
+		 * with core — the plugin-generated routes pure enumeration misses —
+		 * without crawling. Off by default: core sitemaps honour noindex and
+		 * can be disabled, so the set is deliberately a supplement, not a
+		 * replacement. Overlaps with the built-in enumeration are removed by
+		 * the shared dedup.
+		 *
+		 * @param bool $enabled Whether to include core sitemap URLs.
+		 */
+		if ( apply_filters( 'distan_use_core_sitemap', false ) && class_exists( 'Distan_Sitemap_Audit' ) ) {
+			foreach ( Distan_Sitemap_Audit::items() as $entry ) {
+				$items[] = $entry;
+			}
+		}
+
+		return $items;
 	}
 
 	/**
@@ -163,7 +261,8 @@ class Distan_Collector {
 			$base,
 			$max,
 			/* translators: %d: page number */
-			__( '投稿アーカイブ %d ページ目', 'distan' )
+			__( '投稿アーカイブ %d ページ目', 'distan' ),
+			array( 'kind' => 'blog_archive' )
 		);
 	}
 
@@ -226,7 +325,8 @@ class Distan_Collector {
 						__( '%1$s: %2$s', 'distan' ),
 						$taxonomy,
 						$term->name
-					)
+					),
+					array( 'kind' => 'term', 'taxonomy' => $taxonomy, 'id' => (int) $term->term_id, 'page' => 1 )
 				);
 
 				// How many pages this term needs.
@@ -244,7 +344,8 @@ class Distan_Collector {
 					$link,
 					$max,
 					/* translators: 1: term name, 2: page number */
-					$term->name . ' %d ページ目'
+					$term->name . ' %d ページ目',
+					array( 'kind' => 'term', 'taxonomy' => $taxonomy, 'id' => (int) $term->term_id )
 				) as $entry ) {
 					$items[] = $entry;
 				}
@@ -264,13 +365,15 @@ class Distan_Collector {
 	 * @param string $label_tmpl  sprintf template taking one %d (page number).
 	 * @return array<int, array{url: string, path: string, label: string, type: string}>
 	 */
-	private static function paginate( string $base, int $max, string $label_tmpl ): array {
+	private static function paginate( string $base, int $max, string $label_tmpl, array $source = array() ): array {
 		$items = array();
 
 		for ( $page = 2; $page <= $max; $page++ ) {
 			$url = trailingslashit( $base ) . 'page/' . $page . '/';
 
-			$items[] = self::item( $url, sprintf( $label_tmpl, $page ) );
+			$source['page'] = $page;
+
+			$items[] = self::item( $url, sprintf( $label_tmpl, $page ), $source );
 		}
 
 		return $items;
@@ -323,26 +426,50 @@ class Distan_Collector {
 		$slug = (string) apply_filters( 'distan_404_probe', 'distan-404-probe' );
 
 		return array(
-			'url'   => home_url( '/' . trim( $slug, '/' ) . '/' ),
-			'path'  => '404.html',
-			'label' => __( '404ページ', 'distan' ),
-			'type'  => '404',
+			'url'    => home_url( '/' . trim( $slug, '/' ) . '/' ),
+			'path'   => '404.html',
+			'label'  => __( '404ページ', 'distan' ),
+			'type'   => '404',
+			'source' => array( 'kind' => 'not_found' ),
 		);
 	}
 
 	/**
 	 * Shape one queue entry.
 	 *
-	 * @return array{url: string, path: string, label: string, type: string}
+	 * Public so custom sources registered on the `distan_sources` filter can
+	 * build correctly-shaped entries — path derived, provenance attached —
+	 * instead of hand-assembling raw arrays that might drift from the schema.
+	 *
+	 * @param string               $url    Front-end URL to render.
+	 * @param string               $label  Human label, shown in reports.
+	 * @param array<string, mixed> $source Provenance: a 'kind' plus identifying
+	 *                                     keys (e.g. id, taxonomy, page). Left
+	 *                                     empty it produces an unattributed
+	 *                                     entry, which still generates fine.
+	 * @return array{url: string, path: string, label: string, type: string, source: array<string, mixed>}
 	 */
-	private static function item( string $url, string $label ): array {
+	public static function make_item( string $url, string $label, array $source = array() ): array {
 		$path = Distan_Urls::url_to_output_path( $url );
 
 		return array(
-			'url'   => $url,
-			'path'  => null === $path ? '' : $path,
-			'label' => $label,
-			'type'  => 'page',
+			'url'    => $url,
+			'path'   => null === $path ? '' : $path,
+			'label'  => $label,
+			'type'   => 'page',
+			'source' => $source,
 		);
+	}
+
+	/**
+	 * Internal shorthand for a standard page entry.
+	 *
+	 * @param string               $url    URL.
+	 * @param string               $label  Label.
+	 * @param array<string, mixed> $source Provenance.
+	 * @return array{url: string, path: string, label: string, type: string, source: array<string, mixed>}
+	 */
+	private static function item( string $url, string $label, array $source = array() ): array {
+		return self::make_item( $url, $label, $source );
 	}
 }

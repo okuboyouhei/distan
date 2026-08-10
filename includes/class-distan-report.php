@@ -67,6 +67,8 @@ class Distan_Report {
 		$dev_count = isset( $dev['count'] ) ? (int) $dev['count'] : 0;
 		$dev_files = isset( $dev['files'] ) && is_array( $dev['files'] ) ? $dev['files'] : array();
 		$large   = isset( $manifest['large_files'] ) && is_array( $manifest['large_files'] ) ? $manifest['large_files'] : array();
+			$entries = isset( $manifest['entries'] ) && is_array( $manifest['entries'] ) ? $manifest['entries'] : array();
+			$missing = isset( $manifest['sitemap_missing'] ) && is_array( $manifest['sitemap_missing'] ) ? $manifest['sitemap_missing'] : array();
 
 		$finished = (int) ( $manifest['finished'] ?? time() );
 		$when     = get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $finished ), 'Y-m-d H:i' );
@@ -122,7 +124,7 @@ class Distan_Report {
 			$lines[] = 'すでにアップロード済みの場合、本番サーバーから手で削除してください。';
 			$lines[] = '';
 			foreach ( $removed as $file ) {
-				$lines[] = '- `' . $file . '`';
+				$lines[] = '- ' . self::describe( (string) $file, $entries );
 			}
 			$lines[] = '';
 		}
@@ -139,6 +141,21 @@ class Distan_Report {
 				$from = isset( $b['from'] ) ? (string) $b['from'] : '';
 				$to   = isset( $b['to'] ) ? (string) $b['to'] : '';
 				$lines[] = '| `' . $from . '` | `' . $to . '` |';
+			}
+			$lines[] = '';
+		}
+
+		if ( ! empty( $missing ) ) {
+			$lines[] = '## コア sitemap にあって未生成のURL';
+			$lines[] = '';
+			$lines[] = 'WordPress コアの sitemap が挙げているが、今回の列挙では生成されなかったURLです。';
+			$lines[] = 'プラグインが登録した経路など、列挙が把握していないページの可能性があります。';
+			$lines[] = '内容を確認し、必要なら `distan_sources` で追加してください（不要なら無視して構いません）。';
+			$lines[] = '';
+			$lines[] = '| URL |';
+			$lines[] = '| --- |';
+			foreach ( $missing as $url ) {
+				$lines[] = '| `' . (string) $url . '` |';
 			}
 			$lines[] = '';
 		}
@@ -162,7 +179,7 @@ class Distan_Report {
 			$lines[] = '## 追加されたファイル';
 			$lines[] = '';
 			foreach ( $added as $file ) {
-				$lines[] = '- `' . $file . '`';
+				$lines[] = '- ' . self::describe( (string) $file, $entries );
 			}
 			$lines[] = '';
 		}
@@ -183,6 +200,61 @@ class Distan_Report {
 		$lines[] = '_Distan ' . DISTAN_VERSION . ' が生成しました。_';
 
 		return implode( "\n", $lines ) . "\n";
+	}
+
+	/**
+	 * A diff line for one output path: its human label and a provenance tag
+	 * when known, falling back to the bare path (assets, or manifests
+	 * written before provenance existed).
+	 *
+	 * @param string                              $path    Output path.
+	 * @param array<string, array<string, mixed>> $entries path => { label, source }.
+	 */
+	private static function describe( string $path, array $entries ): string {
+		if ( ! isset( $entries[ $path ] ) ) {
+			return '`' . $path . '`';
+		}
+
+		$label = isset( $entries[ $path ]['label'] ) ? (string) $entries[ $path ]['label'] : '';
+		$src   = isset( $entries[ $path ]['source'] ) && is_array( $entries[ $path ]['source'] ) ? $entries[ $path ]['source'] : array();
+		$tag   = self::source_tag( $src );
+		$head  = '' !== $label ? $label : $path;
+
+		return $head . ( '' !== $tag ? ' ' . $tag : '' ) . ' — `' . $path . '`';
+	}
+
+	/**
+	 * A short provenance tag like "[投稿 #123]" from an entry's source.
+	 *
+	 * @param array<string, mixed> $source Provenance.
+	 */
+	private static function source_tag( array $source ): string {
+		if ( empty( $source['kind'] ) ) {
+			return '';
+		}
+
+		$labels = array(
+			'front'        => 'フロントページ',
+			'blog_home'    => '投稿ページ',
+			'blog_archive' => '投稿アーカイブ',
+			'post'         => '投稿',
+			'term'         => 'タクソノミー',
+			'not_found'    => '404',
+			'extra'        => '外部ソース',
+		);
+
+		$kind = (string) $source['kind'];
+		$name = isset( $labels[ $kind ] ) ? $labels[ $kind ] : $kind;
+
+		if ( isset( $source['id'] ) ) {
+			$name .= ' #' . (int) $source['id'];
+		}
+
+		if ( isset( $source['page'] ) && (int) $source['page'] > 1 ) {
+			$name .= ' p' . (int) $source['page'];
+		}
+
+		return '[' . $name . ']';
 	}
 
 	/**

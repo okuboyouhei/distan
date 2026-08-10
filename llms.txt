@@ -26,6 +26,9 @@ Distan は公開中の全ページをループバック HTTP で巡回し、静�
 - サイトマップ書き出し（選択制、sitemap.xml、Google Search Console 対応。著者・日付アーカイブは載せないので ID 露出なし。スラッグ以下や語を含む URL を除外可）
 - robots.txt 書き出し（選択制、最小構成。サイトマップ有効時は Sitemap: 行を記載）
 - リンク監査
+- 列挙の由来（provenance）記録。差分レポートは「投稿タイトル [投稿 #123]」で変更を名指す（増分スキップはしない）
+- カスタム URL ソース（distan_sources）で、列挙が発見できない URL を第一級で追加（重複排除・差分の対象。distan_collect は生の最終手段）
+- コアサイトマップ突き合わせ（wp-sitemap をプロセス内で読み、未生成 URL をレポートに一覧。distan_use_core_sitemap で補助ソースとして列挙にも合流可、既定オフ）
 - 生成完了フック（distan_after_generate）で自動デプロイに接続（Distan自体はデプロイしない）
 - デプロイフック（distan_dispatch）は目視確認後の手動ボタンで発火する人間のゲート。承認状態は持たず最終デプロイ時刻のみ記録。既定オフ
 

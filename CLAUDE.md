@@ -48,12 +48,21 @@ WordPress を制作環境として使い、納品できる静的 HTML を書き�
 | `Distan_Env` | 環境チェック。**状態を変えてはいけない**（報告のみ） |
 | `Distan_Cleaner` | クリーン HTML 出力。head アクションの除去とバッファ処理 |
 | `Distan_Urls` | URL 変換・パス平坦化・クエリ保持。**変換レイヤーの本体** |
-| `Distan_Collector` | 生成対象の列挙 |
+| `Distan_Collector` | 生成対象の列挙（`distan_sources` の合流とパス重複排除を含む） |
 | `Distan_Generator` | 生成・アセットコピー・掃除・リンク監査・マニフェスト |
+| `Distan_Sitemap_Audit` | コア sitemap の読み取りと突き合わせ（HTTP なし）。カバレッジ診断と、選択制の列挙シード |
 | `Distan_Report` | 差分 Markdown と ZIP |
 | `Distan_Markdown` | AI ツール向けの本文抽出と `content.md` 生成（選択制） |
 | `Distan_Admin` | 管理画面とダウンロード配信 |
 | `Distan_Ajax` | AJAX エンドポイント |
+
+## 列挙のキューと由来（provenance）
+
+生成対象は `Distan_Collector::collect()` が WordPress に問い合わせて**列挙**する（クロールしない）。各エントリは `array{ url, path, label, type, source }` で、`source` に由来（`kind` と識別キー）を持つ。`type`/`path` に依存する既存処理を壊さないための加算的フィールド。
+
+- **カスタムソース** — `distan_sources` フィルタに登録した callable が `Distan_Collector::make_item()` でエントリを返す。組み込み列挙と**重複排除の前に**合流するので、追加 URL もカウント・差分・dedup の対象＝第一級。`distan_collect` は生配列を触る最終手段で、これはフィルタの**後**に走るため、その直後にもう一度 dedup してパス衝突による無言の上書きを防ぐ。
+- **マニフェストへの伝搬** — `write_manifest()` がキューから `entries`（path → `{label, source}`）を作って保存し、差分レポートが「投稿タイトル [投稿 #123]」の形で変更を名指せるようにする。削除ページのラベルは前回 `entries` から繰り越す。**差分自体はパス単位のまま**で、由来は表示用。`post_modified` を使った未変更スキップ（増分生成）は**まだ入れていない**。
+
 
 `normalize()` `is_contained()` などのパス関数は **`Distan_Paths` にあります**。他クラスから `self::normalize()` と書くと未定義メソッドエラーになります（実際に踏みました）。
 
