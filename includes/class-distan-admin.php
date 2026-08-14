@@ -252,10 +252,8 @@ class Distan_Admin {
 		?>
 		<div class="wrap distan-wrap" x-data="distanAdmin" x-cloak>
 			<h1><?php esc_html_e( 'Distan', 'distan' ); ?></h1>
-			<p class="distan-tagline">WordPress Development Environment &rarr; Static Site Generator</p>
-
 			<p class="distan-lede">
-				<?php esc_html_e( 'WordPress で作ったページを、納品できる静的HTMLとして書き出します。出力内容はテーマの出力に従うため、納品前に実物を確認してください。', 'distan' ); ?>
+				<?php esc_html_e( 'WordPress を制作環境に、納品用の静的HTML を書き出します。', 'distan' ); ?>
 			</p>
 
 			<nav class="distan-subnav" aria-label="<?php esc_attr_e( 'ページ内ナビゲーション', 'distan' ); ?>">
@@ -485,7 +483,7 @@ class Distan_Admin {
 					</div>
 
 					<h3 class="hgp-settings-group hgp-settings-group--first"><?php esc_html_e( '基本設定', 'distan' ); ?></h3>
-					<p class="hgp-settings-group__note"><?php esc_html_e( '書き出す静的HTMLの基本設定です。案件に合わせて選びます。', 'distan' ); ?></p>
+					<p class="hgp-settings-group__note"><?php esc_html_e( '書き出す静的HTMLの基本設定です。案件に合わせて選んでください。', 'distan' ); ?></p>
 					<table class="form-table" role="presentation">
 						<tr>
 							<th scope="row">
@@ -649,6 +647,120 @@ class Distan_Admin {
 					</div>
 				</form>
 			</section>
+
+			<?php $this->render_help(); ?>
+		</div>
+		<?php
+	}
+
+	/**
+	 * The floating help tool, pinned bottom-right of the admin screen.
+	 *
+	 * Behaviour is a small inline Alpine island (open/close only) — no new
+	 * JavaScript file, no registered component. Content is authored in PHP so
+	 * it is translatable. The tool orients a first-time user toward the flow
+	 * (環境 → 生成 → 受け取り／公開) and points at the sections where the
+	 * detailed, contextual help already lives; it does not duplicate it.
+	 */
+	private function render_help(): void {
+		$doc_url = 'https://github.com/okuboyouhei/distan';
+		?>
+		<div
+			class="distan-help"
+			x-data="{ open: false }"
+			@keydown.escape.window="open = false"
+		>
+			<div
+				class="distan-help__panel"
+				id="distan-help-panel"
+				role="dialog"
+				aria-label="<?php esc_attr_e( 'Distan の使い方', 'distan' ); ?>"
+				x-show="open"
+				x-cloak
+				x-transition.opacity
+				@click.outside="open = false"
+			>
+				<div class="distan-help__head">
+					<h2 class="distan-help__title"><?php esc_html_e( '使い方', 'distan' ); ?></h2>
+					<button
+						type="button"
+						class="distan-help__close"
+						@click="open = false"
+						aria-label="<?php esc_attr_e( '閉じる', 'distan' ); ?>"
+					>&times;</button>
+				</div>
+
+				<div class="distan-help__body">
+					<p class="distan-help__lede">
+						<?php esc_html_e( 'WordPress で作ったページを、納品用の静的HTMLとして書き出す道具です。次の順に進めます。', 'distan' ); ?>
+					</p>
+
+					<h3 class="distan-help__group"><?php esc_html_e( '使い方の流れ', 'distan' ); ?></h3>
+					<ol class="distan-help__steps">
+						<li>
+							<a href="#distan-env" @click="open = false">
+								<span class="distan-help__num">1</span>
+								<span>
+									<strong><?php esc_html_e( '環境を確認する', 'distan' ); ?></strong>
+									<span class="distan-help__note"><?php esc_html_e( 'ループバック通信が通れば書き出せます。', 'distan' ); ?></span>
+								</span>
+							</a>
+						</li>
+						<li>
+							<a href="#distan-generate" @click="open = false">
+								<span class="distan-help__num">2</span>
+								<span>
+									<strong><?php esc_html_e( '静的HTMLを書き出す', 'distan' ); ?></strong>
+									<span class="distan-help__note"><?php esc_html_e( '「生成」で全ページを書き出します。', 'distan' ); ?></span>
+								</span>
+							</a>
+						</li>
+						<li>
+							<a href="#distan-generate" @click="open = false">
+								<span class="distan-help__num">3</span>
+								<span>
+									<strong><?php esc_html_e( '受け取る／公開する', 'distan' ); ?></strong>
+									<span class="distan-help__note"><?php esc_html_e( 'ZIP をダウンロードして納品、または「デプロイ」で公開処理へ。', 'distan' ); ?></span>
+								</span>
+							</a>
+						</li>
+					</ol>
+
+					<h3 class="distan-help__group"><?php esc_html_e( 'こんなときは', 'distan' ); ?></h3>
+					<ul class="distan-help__tips">
+						<li>
+							<?php esc_html_e( 'リンク切れ・404・ローカルで JS が動かない — ', 'distan' ); ?>
+							<a href="#distan-generate" @click="open = false"><?php esc_html_e( '「生成」の結果', 'distan' ); ?></a>
+							<?php esc_html_e( 'に、各項目の対処が表示されます。', 'distan' ); ?>
+						</li>
+						<li>
+							<?php esc_html_e( '納品した本番が検索結果に出ない — ', 'distan' ); ?>
+							<a href="#distan-settings" @click="open = false"><?php esc_html_e( '「設定」の検索エンジンの扱い', 'distan' ); ?></a>
+							<?php esc_html_e( 'で noindex を除去してから生成し直します。', 'distan' ); ?>
+						</li>
+					</ul>
+
+					<h3 class="distan-help__group"><?php esc_html_e( 'もっと詳しく', 'distan' ); ?></h3>
+					<p class="distan-help__doc">
+						<a href="<?php echo esc_url( $doc_url ); ?>" target="_blank" rel="noopener noreferrer">
+							<?php esc_html_e( 'ドキュメント（GitHub）', 'distan' ); ?>
+							<span class="distan-help__ext" aria-hidden="true">↗</span>
+						</a>
+					</p>
+				</div>
+			</div>
+
+			<button
+				type="button"
+				class="distan-help__toggle"
+				@click="open = ! open"
+				:class="{ 'is-open': open }"
+				:aria-expanded="open"
+				aria-controls="distan-help-panel"
+			>
+				<span class="distan-help__mark" aria-hidden="true">?</span>
+				<span class="distan-help__label"><?php esc_html_e( '使い方', 'distan' ); ?></span>
+			</button>
 		</div>
 		<?php
 	}

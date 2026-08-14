@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.1.8
+Stable tag: 1.1.9
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -89,6 +89,11 @@ Yes, with a classic theme. Block themes load their JavaScript as ES modules, whi
 Yes. Classic and block themes are both supported, including the block navigation's interactivity, importmap paths, and module files.
 
 == Changelog ==
+
+= 1.1.9 =
+* Added: a help tool pinned to the bottom-right of the Distan admin screen. A small "使い方" button opens a short panel that walks a first-time user through the flow — check environment, generate, then receive or deploy — with each step jumping to the matching section, plus pointers to where the detailed, contextual help already lives. It does not repeat that detail. Behaviour is open/close only (Alpine, already bundled); no new JavaScript file is added. This is admin-only UI — nothing in the generated output changes.
+* Changed: simplified the admin masthead to a single calm line under the title, replacing the uppercase English tagline and the two-sentence lede. Admin-only cosmetic change; nothing in the generated output changes.
+* Changed: re-themed the admin colour palette to match the Distan book cover — a warm cream kraft ground with a single cardboard-kraft ink stamp for action, in place of the previous cool paper and green accent. Admin-only; nothing in the generated output changes.
 
 = 1.1.8 =
 * Added: a sticky in-page navigation bar on the Distan admin screen. It follows the page as you scroll and jumps to the environment / generate / settings sections, with the current section highlighted as you move through them. This is admin-only UI — nothing in the generated output changes.

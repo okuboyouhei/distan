@@ -1,21 +1,22 @@
 /* Distan admin — "Distan Dispatch"
-   A packing-slip worksheet: cool recycled stock, single stamp-green accent,
-   monospace numerals and paths, hairline rules, near-zero radius.
+   A packing-slip worksheet, themed to the Distan book cover: warm cream kraft
+   stock, a single cardboard-kraft ink stamp for action, monospace numerals and
+   paths, hairline rules, near-zero radius.
    See DESIGN.md for the rationale behind every token. */
 
 .distan-wrap {
-	--dsp-ink: #1A1D21;
-	--dsp-slate: #4B535E;
-	--dsp-line: #DDE1E6;
+	--dsp-ink: #201C16;
+	--dsp-slate: #6A655B;
+	--dsp-line: #DED9CC;
 	--dsp-panel: #FFFFFF;
-	--dsp-ground: #F3F1EC;
-	--dsp-stamp: #15544A;
-	--dsp-stamp-dark: #0E3E37;
+	--dsp-ground: #F0EFE3;
+	--dsp-stamp: #7A5A34;
+	--dsp-stamp-dark: #5E4527;
 	--dsp-ok: #15654A;
 	--dsp-warn: #8A5A00;
-	--dsp-warn-tint: #F6F1E6;
+	--dsp-warn-tint: #F3ECD9;
 	--dsp-danger: #9E3319;
-	--dsp-danger-tint: #F6ECE8;
+	--dsp-danger-tint: #F3E6E0;
 	--dsp-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
 	max-width: 1000px;
@@ -25,17 +26,28 @@
 
 [x-cloak] { display: none !important; }
 
-.distan-tagline {
-	margin: -4px 0 0;
-	color: var(--dsp-slate);
-	font-size: 11px;
-	letter-spacing: .08em;
-	text-transform: uppercase;
+/* Paint the desk. This stylesheet is enqueued only on the Distan screen, so
+   tinting the WordPress content canvas here is safe and scoped to this page.
+   Without it the cream ground shows only in small inset tokens and the desk
+   stays WP's default grey; painting it lets white panels read as sheets on
+   cream kraft stock, matching the book cover. Value mirrors --dsp-ground. */
+body { background-color: #F0EFE3; }
+#wpcontent,
+#wpbody-content { background-color: transparent; }
+
+/* Masthead — a job-ticket header, not a hero. Title then one calm line;
+   no uppercase English tagline, no second paragraph. */
+.distan-wrap h1 {
+	margin: 0;
+	font-size: 23px;
+	font-weight: 600;
+	letter-spacing: .01em;
+	color: var(--dsp-ink);
 }
 
 .distan-lede {
 	max-width: 62ch;
-	margin: 14px 0 26px;
+	margin: 6px 0 26px;
 	color: var(--dsp-slate);
 }
 
@@ -490,5 +502,276 @@ html {
 
 	.distan-wrap .hgp-card[id] {
 		scroll-margin-top: 52px;
+	}
+}
+
+/* --- Help tool (ヘルプツール) — pinned bottom-right ------------------ */
+/* A small job-ticket helper the user can call up when unsure what to do.
+   Behaviour is inline Alpine (open/close only). Tokens inherit from
+   .distan-wrap since this lives inside it.
+
+   Design note: the flat in-flow cards carry no shadow (see DESIGN.md).
+   This is the one exception — a floating layer is literally a sheet
+   lifted off the desk to hand over, so it gets a single faint lift to
+   separate it from arbitrary page content beneath. Kept minimal: no
+   glow, no gradient, hairline border still does the structural work. */
+
+.distan-help {
+	position: fixed;
+	right: 24px;
+	bottom: 24px;
+	z-index: 9999;
+	display: flex;
+	flex-direction: column;
+	align-items: flex-end;
+	gap: 10px;
+}
+
+/* The call button — a stamp-green tab, not a round consumer FAB. */
+.distan-help__toggle {
+	display: inline-flex;
+	align-items: center;
+	gap: 8px;
+	padding: 8px 14px;
+	background: var(--dsp-stamp);
+	color: #fff;
+	border: 1px solid var(--dsp-stamp-dark);
+	border-radius: 2px;
+	font-size: 13px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.distan-help__toggle:hover,
+.distan-help__toggle:focus {
+	background: var(--dsp-stamp-dark);
+}
+
+.distan-help__toggle:focus-visible {
+	outline: 2px solid var(--dsp-stamp-dark);
+	outline-offset: 2px;
+}
+
+.distan-help__toggle.is-open {
+	background: var(--dsp-stamp-dark);
+}
+
+.distan-help__mark {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 16px;
+	height: 16px;
+	border: 1px solid rgba(255, 255, 255, .8);
+	border-radius: 2px;
+	font-family: var(--dsp-mono);
+	font-size: 11px;
+	font-weight: 700;
+}
+
+.distan-help__label {
+	letter-spacing: .02em;
+}
+
+/* The panel — a worksheet laid over the desk. */
+.distan-help__panel {
+	width: 340px;
+	max-width: calc(100vw - 48px);
+	max-height: min(70vh, 560px);
+	overflow-y: auto;
+	background: var(--dsp-panel);
+	border: 1px solid var(--dsp-line);
+	border-radius: 2px;
+	box-shadow: 0 6px 22px rgba(32, 28, 22, .16);
+}
+
+.distan-help__head {
+	position: sticky;
+	top: 0;
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	gap: 12px;
+	padding: 12px 16px;
+	background: var(--dsp-panel);
+	border-bottom: 1px solid var(--dsp-line);
+}
+
+.distan-help__title {
+	margin: 0;
+	font-size: 15px;
+	font-weight: 600;
+	color: var(--dsp-ink);
+}
+
+.distan-help__close {
+	padding: 0;
+	width: 26px;
+	height: 26px;
+	background: none;
+	border: 1px solid transparent;
+	border-radius: 2px;
+	color: var(--dsp-slate);
+	font-size: 20px;
+	line-height: 1;
+	cursor: pointer;
+}
+
+.distan-help__close:hover,
+.distan-help__close:focus {
+	color: var(--dsp-ink);
+	background: var(--dsp-ground);
+}
+
+.distan-help__close:focus-visible {
+	outline: 2px solid var(--dsp-stamp);
+}
+
+.distan-help__body {
+	padding: 4px 16px 18px;
+}
+
+.distan-help__lede {
+	margin: 12px 0 4px;
+	color: var(--dsp-slate);
+	font-size: 12px;
+	line-height: 1.7;
+}
+
+.distan-help__group {
+	margin: 20px 0 8px;
+	padding-top: 12px;
+	border-top: 1px solid var(--dsp-line);
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: .02em;
+	color: var(--dsp-slate);
+}
+
+/* Steps — numbered line items, each jumps to its section and closes. */
+.distan-help__steps {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+	counter-reset: none;
+}
+
+.distan-help__steps li {
+	margin: 0;
+	border-bottom: 1px solid #ECEAE4;
+}
+
+.distan-help__steps li:last-child {
+	border-bottom: 0;
+}
+
+.distan-help__steps a {
+	display: flex;
+	align-items: flex-start;
+	gap: 10px;
+	padding: 10px 4px;
+	color: var(--dsp-ink);
+	text-decoration: none;
+	border-radius: 2px;
+}
+
+.distan-help__steps a:hover,
+.distan-help__steps a:focus {
+	background: var(--dsp-ground);
+}
+
+.distan-help__steps a:focus-visible {
+	outline: 2px solid var(--dsp-stamp);
+	outline-offset: -2px;
+}
+
+.distan-help__num {
+	flex: 0 0 auto;
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	width: 20px;
+	height: 20px;
+	background: var(--dsp-ground);
+	border: 1px solid var(--dsp-line);
+	border-radius: 2px;
+	font-family: var(--dsp-mono);
+	font-size: 12px;
+	color: var(--dsp-stamp-dark);
+	font-variant-numeric: tabular-nums;
+}
+
+.distan-help__steps strong {
+	display: block;
+	font-size: 13px;
+	font-weight: 600;
+}
+
+.distan-help__note {
+	display: block;
+	margin-top: 2px;
+	color: var(--dsp-slate);
+	font-size: 12px;
+	line-height: 1.6;
+}
+
+/* Tips — pointers into the sections that already explain the detail. */
+.distan-help__tips {
+	margin: 0;
+	padding: 0;
+	list-style: none;
+}
+
+.distan-help__tips li {
+	margin: 0 0 10px;
+	color: var(--dsp-slate);
+	font-size: 12px;
+	line-height: 1.7;
+}
+
+.distan-help__tips li:last-child {
+	margin-bottom: 0;
+}
+
+.distan-help__tips a,
+.distan-help__doc a {
+	color: var(--dsp-stamp-dark);
+	text-decoration: underline;
+	text-underline-offset: 2px;
+}
+
+.distan-help__tips a:hover,
+.distan-help__tips a:focus,
+.distan-help__doc a:hover,
+.distan-help__doc a:focus {
+	color: var(--dsp-ink);
+}
+
+.distan-help__doc {
+	margin: 0;
+	font-size: 12px;
+}
+
+.distan-help__ext {
+	font-size: 11px;
+}
+
+/* On small screens the admin menu collapses; keep the tool reachable and
+   let the panel use the width it needs without spilling off-canvas. */
+@media screen and (max-width: 782px) {
+	.distan-help {
+		right: 16px;
+		bottom: 16px;
+	}
+
+	.distan-help__panel {
+		width: calc(100vw - 32px);
+		max-height: 66vh;
+	}
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.distan-help__panel {
+		transition: none !important;
 	}
 }
