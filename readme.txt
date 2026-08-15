@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.1.9
+Stable tag: 1.2.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -88,7 +88,14 @@ Yes, with a classic theme. Block themes load their JavaScript as ES modules, whi
 
 Yes. Classic and block themes are both supported, including the block navigation's interactivity, importmap paths, and module files.
 
+= A page changes its content based on a URL query parameter (?filter=chair). Can Distan handle it? =
+
+Yes, with an explicit opt-in. Name the query keys that change the page with the distan_variant_keys filter, then register the specific URLs you want to ship with the distan_sources filter — usually built in a loop from the same terms or posts the page's pulldown or checkboxes are built from. Each value becomes its own static file. Because a plain static host addresses files by path only, the query is folded into the path: the published URL becomes /products/filter-chair/ rather than /products/?filter=chair. Distan does not discover these automatically — pulldown and multi-checkbox URLs are not links in the page, and their combinations are unbounded — so you decide which ones to generate. See README.md for copy-paste examples.
+
 == Changelog ==
+
+= 1.2.0 =
+* Added: optional support for pages whose content changes with a URL query parameter (for example /guide/?tab=faq versus /guide/?tab=news). List the query keys that matter with the new distan_variant_keys filter, and each value is written as its own static file under a path like /guide/tab-faq/, with internal links to those URLs rewritten to match. Register the specific variant URLs through the existing distan_sources filter so they are discovered and generated. Off by default: with no keys listed, query strings on page URLs are dropped exactly as before, so nothing changes unless you opt in. Query keys you do not list (utm_source, fbclid and the like) are ignored, so this cannot multiply into unwanted files. The folded path format can be changed with the distan_query_variant_segment filter. Because a plain static host can only address files by path, the query has to be folded into the path — the published URL becomes /guide/tab-faq/ rather than /guide/?tab=faq.
 
 = 1.1.9 =
 * Added: a help tool pinned to the bottom-right of the Distan admin screen. A small "使い方" button opens a short panel that walks a first-time user through the flow — check environment, generate, then receive or deploy — with each step jumping to the matching section, plus pointers to where the detailed, contextual help already lives. It does not repeat that detail. Behaviour is open/close only (Alpine, already bundled); no new JavaScript file is added. This is admin-only UI — nothing in the generated output changes.

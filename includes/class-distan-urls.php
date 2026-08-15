@@ -113,7 +113,17 @@ class Distan_Urls {
 			return self::remap_asset( ltrim( rawurldecode( $path ), '/' ) );
 		}
 
-		return self::page_path_for( $path );
+		$page_path = self::page_path_for( $path );
+
+		// Fold any registered query-variant keys into the path so ?tab=a and
+		// ?tab=b become distinct, path-addressable files. Unregistered query
+		// keys are ignored, so the path is unchanged unless a site opts in.
+		$pairs = self::significant_query( isset( $parts['query'] ) ? (string) $parts['query'] : '' );
+		if ( ! empty( $pairs ) ) {
+			return self::variant_page_path( $page_path, self::fold_query_segment( $pairs, $url ) );
+		}
+
+		return $page_path;
 	}
 
 	/**
@@ -316,6 +326,145 @@ class Distan_Urls {
 		);
 
 		return $flat ? $decoded . '.html' : $decoded . '/index.html';
+	}
+
+	/**
+	 * Query keys that make a page a distinct variant.
+	 *
+	 * Empty by default: without an explicit opt-in, query strings on page URLs
+	 * are dropped exactly as before, so behaviour is unchanged for anyone not
+	 * using this. A site declares the keys that actually change the rendered
+	 * page — ?tab=, ?lang=, a filter parameter — through the distan_variant_keys
+	 * filter, and only those keys ever fold into a path or survive on a link.
+	 * Tracking noise (utm_*, fbclid, replytocom, …) is ignored, so opting in
+	 * cannot explode enumeration into thousands of files.
+	 *
+	 * @return array<int, string>
+	 */
+	public static function variant_keys(): array {
+		/**
+		 * Register query keys that select a distinct page variant.
+		 *
+		 * @param array<int, string> $keys Query parameter names, e.g. array( 'tab', 'lang' ).
+		 */
+		$keys = apply_filters( 'distan_variant_keys', array() );
+
+		return is_array( $keys )
+			? array_values( array_unique( array_map( 'strval', $keys ) ) )
+			: array();
+	}
+
+	/**
+	 * The significant query pairs of a query string, sorted by key.
+	 *
+	 * Only keys registered through {@see variant_keys()} are kept. Order is
+	 * normalised (ksort) so ?b=2&a=1 and ?a=1&b=2 fold to the same file. Array
+	 * parameters (a[]=1) and empty declarations are skipped.
+	 *
+	 * @return array<string, string> key => value, sorted by key.
+	 */
+	private static function significant_query( string $query ): array {
+		if ( '' === $query ) {
+			return array();
+		}
+
+		$keys = self::variant_keys();
+		if ( empty( $keys ) ) {
+			return array();
+		}
+
+		$parsed = array();
+		parse_str( $query, $parsed );
+
+		$out = array();
+		foreach ( $keys as $key ) {
+			if ( array_key_exists( $key, $parsed ) && is_scalar( $parsed[ $key ] ) ) {
+				$out[ $key ] = (string) $parsed[ $key ];
+			}
+		}
+
+		ksort( $out );
+
+		return $out;
+	}
+
+	/**
+	 * Fold significant query pairs into a single path segment.
+	 *
+	 * Produces "key-value" per pair, joined by "_" in key order, with each key
+	 * and value percent-encoded so the segment is one safe path component with
+	 * no stray slashes (?a=1&b=2 → a-1_b-2, ?tab=faq → tab-faq). The default
+	 * deliberately avoids "=" and "," so the directory name is plain
+	 * [A-Za-z0-9._-] for the usual slug-like values and travels cleanly across
+	 * static hosts. Replace the whole segment through the
+	 * distan_query_variant_segment filter if a host wants a different shape.
+	 *
+	 * @param array<string, string> $pairs Significant pairs (already sorted).
+	 * @param string                $url   Source URL, for filter context.
+	 * @return string Segment without surrounding slashes, or '' if no pairs.
+	 */
+	private static function fold_query_segment( array $pairs, string $url ): string {
+		if ( empty( $pairs ) ) {
+			return '';
+		}
+
+		$parts = array();
+		foreach ( $pairs as $key => $value ) {
+			$parts[] = rawurlencode( $key ) . '-' . rawurlencode( $value );
+		}
+		$segment = implode( '_', $parts );
+
+		/**
+		 * Filter the folded path segment for a query variant.
+		 *
+		 * @param string                $segment Default "key-value" per pair, joined by "_".
+		 * @param array<string, string> $pairs   Significant key => value pairs.
+		 * @param string                $url     Source URL.
+		 */
+		$segment = (string) apply_filters( 'distan_query_variant_segment', $segment, $pairs, $url );
+
+		// A segment must stay inside the page directory: normalise slashes,
+		// drop empty/./.. components so a filter can never climb the tree.
+		$segment = str_replace( '\\', '/', $segment );
+		$clean   = array();
+		foreach ( explode( '/', $segment ) as $seg ) {
+			if ( '' === $seg || '.' === $seg || '..' === $seg ) {
+				continue;
+			}
+			$clean[] = $seg;
+		}
+
+		return implode( '/', $clean );
+	}
+
+	/**
+	 * Insert a variant segment into a base page path.
+	 *
+	 * about/index.html + "tab=spec" → about/tab=spec/index.html
+	 * about.html       + "tab=spec" → about/tab=spec/index.html
+	 * index.html       + "tab=spec" → tab=spec/index.html
+	 *
+	 * A variant always takes the directory/index.html form: it is a distinct
+	 * address, and a flat about.html cannot own children.
+	 */
+	private static function variant_page_path( string $base_page_path, string $segment ): string {
+		if ( '' === $segment ) {
+			return $base_page_path;
+		}
+
+		if ( 'index.html' === $base_page_path ) {
+			$dir = '';
+		} elseif ( str_ends_with( $base_page_path, '/index.html' ) ) {
+			$dir = substr( $base_page_path, 0, -strlen( '/index.html' ) );
+		} elseif ( str_ends_with( $base_page_path, '.html' ) ) {
+			$dir = substr( $base_page_path, 0, -strlen( '.html' ) );
+		} else {
+			$dir = $base_page_path;
+		}
+
+		$dir = trim( $dir, '/' );
+
+		return ( '' === $dir ? '' : $dir . '/' ) . $segment . '/index.html';
 	}
 
 	/**
@@ -642,12 +791,14 @@ class Distan_Urls {
 			$fragment           = '#' . $fragment;
 		}
 
-		// Query strings are stripped from page URLs: a static file cannot
-		// serve /search/?q=foo. They are KEPT on asset URLs, so that
-		// cache-busting written by the theme — filemtime(), ?ver=, ?v= —
-		// survives. With filename-hashing rejected (it breaks FTP overwrite),
-		// the query is the only cache-buster that works for an overwrite-based
-		// deployment, and no internal asset query is worth discarding.
+		// Query strings on page URLs are dropped by default: a static file
+		// cannot serve /search/?q=foo. The exception is registered variant
+		// keys (distan_variant_keys), which are folded into the path below so
+		// a link to /slug/?tab=a resolves to the tab=a file. On ASSET URLs the
+		// whole query is KEPT, so cache-busting written by the theme —
+		// filemtime(), ?ver=, ?v= — survives. With filename-hashing rejected
+		// (it breaks FTP overwrite), the query is the only cache-buster that
+		// works for an overwrite-based deployment.
 		$query = '';
 		if ( str_contains( $url, '?' ) ) {
 			[ $url, $query ] = explode( '?', $url, 2 );
@@ -680,10 +831,23 @@ class Distan_Urls {
 			return $url . ( '' !== $query ? '?' . $query : '' ) . $fragment;
 		}
 
+		$is_file = self::looks_like_file( '/' . $target );
+
+		// Pages: fold any registered variant keys from the query into the path
+		// so a link to /slug/?tab=a points at the tab=a file. Other page query
+		// keys are dropped (a static file cannot switch on them). Assets skip
+		// this and keep their raw query as a cache-buster, as before.
+		if ( ! $is_file && '' !== $query ) {
+			$pairs = self::significant_query( $query );
+			if ( ! empty( $pairs ) ) {
+				$target = self::variant_page_path( $target, self::fold_query_segment( $pairs, $url ) );
+			}
+		}
+
 		self::maybe_queue_asset( $target );
 
 		// Keep the query only for real files (assets); drop it for pages.
-		$keep_query = '' !== $query && self::looks_like_file( '/' . $target );
+		$keep_query = '' !== $query && $is_file;
 
 		// $target is the real, decoded on-disk path. Re-encode each segment for
 		// the href so the emitted URL is canonical ASCII, which a browser or

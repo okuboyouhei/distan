@@ -269,13 +269,75 @@ add_filter( 'distan_url_replacements', function ( $pairs ) {
 
 利用できるフィルタ:
 
-`distan_capability` `distan_collect` `distan_post_types` `distan_taxonomies` `distan_archive_max_pages` `distan_term_max_pages` `distan_404_probe` `distan_head_actions` `distan_dequeue_handles` `distan_remove_global_styles` `distan_robots` `distan_clean_html` `distan_flatten_theme` `distan_uploads_dir` `distan_blocked_extensions` `distan_clean_output` `distan_url_replacements`
+`distan_capability` `distan_collect` `distan_post_types` `distan_taxonomies` `distan_archive_max_pages` `distan_term_max_pages` `distan_404_probe` `distan_head_actions` `distan_dequeue_handles` `distan_remove_global_styles` `distan_robots` `distan_clean_html` `distan_flatten_theme` `distan_uploads_dir` `distan_blocked_extensions` `distan_clean_output` `distan_url_replacements` `distan_sources` `distan_variant_keys` `distan_query_variant_segment`
 
 ### 構造化データ（JSON-LD）について
 
 Distan は構造化データを**生成しません**。テーマや SEO プラグイン（Yoast SEO、AIOSEO など）が出力した JSON-LD を、静的化時にそのまま保持し、内部の URL を本番 URL に置換します。構造化データを入れたい場合は、これらのプラグインで設定してください。Distan はそれを壊さず、本番向けの URL に直して書き出します。
 
 構造化データ内の URL のうち、基本のドメイン置換（`site_url` 設定）で届かないもの（CDN 上のロゴ URL など）は、上記の `distan_url_replacements` で調整できます。制作環境が非公開・別ドメインでも、置換を前提にすることで本番向けの正しい構造化データを書き出せます。
+
+## URL パラメータで表示が変わるページ
+
+`/products/?filter=chair` のように、**URL のクエリパラメータで表示を出し分けている**ページも静的化できます。ただし前提が 2 つあります。
+
+1. 素の静的ホストはパスでしか引けないので、クエリは**パスに畳み込まれます**。公開 URL は `/products/?filter=chair` ではなく `/products/filter-chair/` になります。
+2. どの値・どの組み合わせを静的化するかは**あなたが宣言します**。プルダウンや複数チェックで生成される URL はページ内にリンクとして存在せず、組み合わせも無数にあり得るため、Distan は自動では発見できません（＝勝手に増やしません）。
+
+手順は 2 つ。**表示を分けるキーを `distan_variant_keys` で宣言**し、**実際に納品する URL を `distan_sources` で登録**します。値の元はたいていタームや投稿なので、そのデータから回せば手打ちにはなりません。
+
+```php
+// 例1: 単一の絞り込み（タクソノミー1つ）ぶんを静的化する
+add_filter( 'distan_variant_keys', fn( $k ) => array_merge( $k, array( 'filter' ) ) );
+
+add_filter( 'distan_sources', function ( $providers ) {
+    $providers[] = function () {
+        $items = array();
+        foreach ( get_terms( array( 'taxonomy' => 'product_cat', 'hide_empty' => false ) ) as $term ) {
+            $items[] = array(
+                'url'    => home_url( '/products/?filter=' . $term->slug ),
+                'label'  => '商品一覧（' . $term->name . '）',
+                'source' => array( 'kind' => 'extra', 'origin' => 'variant:filter' ),
+            );
+        }
+        return $items;
+    };
+    return $providers;
+} );
+```
+
+複数チェック（複数キーの組み合わせ）まで静的化したい場合は、**全直積を展開せず、実際に使う組み合わせだけ**を配列で持って回します。
+
+```php
+// 例2: 納品対象にする組み合わせだけを明示する
+$combos = array(
+    array( 'color' => 'red',  'size' => 'l' ),
+    array( 'color' => 'red',  'size' => 'm' ),
+    array( 'color' => 'blue', 'size' => 'l' ),
+);
+
+add_filter( 'distan_variant_keys', fn( $k ) => array_merge( $k, array( 'color', 'size' ) ) );
+
+add_filter( 'distan_sources', function ( $providers ) use ( $combos ) {
+    $providers[] = function () use ( $combos ) {
+        return array_map( function ( $c ) {
+            return array(
+                'url'    => add_query_arg( $c, home_url( '/products/' ) ),
+                'label'  => '商品一覧（' . implode( ' / ', $c ) . '）',
+                'source' => array( 'kind' => 'extra', 'origin' => 'variant:combo' ),
+            );
+        }, $combos );
+    };
+    return $providers;
+} );
+```
+
+このとき出力は `products/color-red_size-l/index.html` のようになります（キーはキー順に正規化されるので `?size=l&color=red` の順ゆらぎでも同じファイル）。宣言したキー以外のクエリ（`utm_*` など）は無視されるので、生成が意図せず膨らむことはありません。
+
+補足:
+
+- 内部リンクが `/products/?filter=chair` を指していれば、その `href` も畳み込み先へ自動で書き換わります。宣言したのに未登録の変種がリンクされている場合は、生成後のリンク監査に「リンク切れ（未生成）」として出るので、取りこぼしに気づけます。
+- 畳み込みのディレクトリ名の形式を変えたい場合は `distan_query_variant_segment` フィルタで差し替えられます（スラッグ化など）。
 
 ## 自動デプロイ（生成完了フック）
 

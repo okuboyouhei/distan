@@ -3,7 +3,7 @@
  * Plugin Name: Distan
  * Plugin URI:  https://github.com/okuboyouhei/distan
  * Description: dist で開発する、WordPress静的サイトジェネレーター。HTML納品案件のために、WordPressを制作環境として使い、余計なものを含まない静的HTMLを書き出します。
- * Version:     1.1.9
+ * Version:     1.2.0
  * Author:      Youhei Okubo
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'DISTAN_VERSION', '1.1.9' );
+define( 'DISTAN_VERSION', '1.2.0' );
 define( 'DISTAN_FILE', __FILE__ );
 define( 'DISTAN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DISTAN_URL', plugin_dir_url( __FILE__ ) );
