@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.0
 Requires PHP: 8.0
-Stable tag: 1.2.0
+Stable tag: 1.3.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -93,6 +93,12 @@ Yes. Classic and block themes are both supported, including the block navigation
 Yes, with an explicit opt-in. Name the query keys that change the page with the distan_variant_keys filter, then register the specific URLs you want to ship with the distan_sources filter — usually built in a loop from the same terms or posts the page's pulldown or checkboxes are built from. Each value becomes its own static file. Because a plain static host addresses files by path only, the query is folded into the path: the published URL becomes /products/filter-chair/ rather than /products/?filter=chair. Distan does not discover these automatically — pulldown and multi-checkbox URLs are not links in the page, and their combinations are unbounded — so you decide which ones to generate. See README.md for copy-paste examples.
 
 == Changelog ==
+
+= 1.3.0 =
+* Added: a differential download. Alongside the existing full ZIP, Distan can now hand you a ZIP of only the files added or changed since the last generation, laid out at their real paths so it unzips straight onto production — no re-uploading the whole site. Files that were in the previous delivery but were not generated this time are listed in a bundled DELETE.txt (with a short distan-diff.md delivery note), so removals are explicit rather than forgotten. The full ZIP remains for first delivery and larger milestones; the differential ZIP is for routine updates.
+* Added: content-hash change detection. Each generated page's HTML is hashed, so a page whose path is unchanged but whose content actually changed — an edited notice, a refreshed "latest posts" list — is now reported as modified. Previously the diff could only see paths that were added or removed, so an in-place edit slipped through. Assets remain tracked by add/remove. On the first run after upgrading, hashes are recorded but nothing is flagged as modified; detection begins on the next run, so upgrading never mass-flags every page.
+* Added: the distan_manifest_source filter (db by default, or output). In output mode the diff baseline is carried as a portable manifest inside the output tree (.distan/manifest.json) so it travels with the deliverable — the right choice when you generate in one place and deploy from another (local or CI to a separate server). A deny rule is written beside it (.distan/.htaccess) to keep the meta directory out of public serving on Apache; other servers need an equivalent location rule. The default db mode keeps the baseline in the WordPress option exactly as before, so nothing changes unless you opt in.
+* Added: a read-only diff status line on the generate screen — the current baseline source, the last generation time, and a notice when there is no previous baseline, so the "everything counts as new next time" case is visible before it happens. The differential download can be turned off with the new 差分ZIP setting; change detection keeps running regardless, so enabling it later still produces a correct diff from that point on.
 
 = 1.2.0 =
 * Added: optional support for pages whose content changes with a URL query parameter (for example /guide/?tab=faq versus /guide/?tab=news). List the query keys that matter with the new distan_variant_keys filter, and each value is written as its own static file under a path like /guide/tab-faq/, with internal links to those URLs rewritten to match. Register the specific variant URLs through the existing distan_sources filter so they are discovered and generated. Off by default: with no keys listed, query strings on page URLs are dropped exactly as before, so nothing changes unless you opt in. Query keys you do not list (utm_source, fbclid and the like) are ignored, so this cannot multiply into unwanted files. The folded path format can be changed with the distan_query_variant_segment filter. Because a plain static host can only address files by path, the query has to be folded into the path — the published URL becomes /guide/tab-faq/ rather than /guide/?tab=faq.

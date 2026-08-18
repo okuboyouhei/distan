@@ -32,6 +32,16 @@ class Distan_Generator {
 	public const MANIFEST_KEY = 'distan_manifest';
 
 	/**
+	 * Quarantined meta directory inside the output root. When the manifest
+	 * source is 'output', the portable diff baseline is carried here so it
+	 * travels with the deliverable across environments. Kept out of the
+	 * public web by the deny rule written alongside it.
+	 */
+	public const META_DIR       = '.distan';
+	public const MANIFEST_FILE  = '.distan/manifest.json';
+	public const META_DENY_FILE = '.distan/.htaccess';
+
+	/**
 	 * Start a run. Returns the job state.
 	 *
 	 * @return array<string, mixed>
@@ -44,6 +54,7 @@ class Distan_Generator {
 			'index'       => 0,
 			'total'       => count( $queue ),
 			'written'     => array(),
+			'hashes'      => array(),
 			'assets'      => array(),
 			'errors'      => array(),
 			'md_started'  => false,
@@ -134,6 +145,9 @@ class Distan_Generator {
 			}
 
 			$job['written'][] = $item['path'];
+			// Content hash of the bytes just written, for the next run's
+			// modified-file diff. Pages only; assets stay add/remove-tracked.
+			$job['hashes'][ $item['path'] ] = isset( $result['hash'] ) ? (string) $result['hash'] : '';
 			$job['assets']    = array_merge( $job['assets'], $result['assets'] );
 
 			if ( ! empty( $result['has_modules'] ) ) {
@@ -321,6 +335,10 @@ class Distan_Generator {
 			'assets'      => $rewritten['assets'],
 			'has_modules' => $has_modules,
 			'md_section'  => $section,
+			// Hash the exact bytes written to disk so the diff reflects what
+			// a deploy would actually upload. sha1 is change-detection, not
+			// security, so its speed and ubiquity are what matter here.
+			'hash'        => sha1( $rewritten['html'] ),
 		);
 	}
 
@@ -663,6 +681,13 @@ class Distan_Generator {
 			}
 		}
 
+		// Portable manifest and its deny rule. Kept unconditionally: cleanup
+		// runs before the manifest is read, so stripping these here would
+		// destroy the previous baseline before the diff can use it. Absent in
+		// 'db' mode, in which case keeping the names is simply a no-op.
+		$keep_extra[] = self::MANIFEST_FILE;
+		$keep_extra[] = self::META_DENY_FILE;
+
 		$keep = array_flip(
 			array_merge( $job['written'], array_keys( $job['assets'] ), $keep_extra )
 		);
@@ -732,8 +757,8 @@ class Distan_Generator {
 	 * @param array<string, mixed> $job Job state.
 	 */
 	private static function write_manifest( array $job ): void {
-		$previous_manifest = get_option( self::MANIFEST_KEY, array() );
-		$previous_manifest = is_array( $previous_manifest ) ? $previous_manifest : array();
+		$source            = self::manifest_source();
+		$previous_manifest = self::read_previous_manifest( $source );
 
 		$previous = isset( $previous_manifest['files'] ) && is_array( $previous_manifest['files'] )
 			? $previous_manifest['files']
@@ -767,6 +792,30 @@ class Distan_Generator {
 		$removed = array_values( array_diff( $previous, $current ) );
 		$added   = array_values( array_diff( $current, $previous ) );
 
+		// Pages present in both runs whose content hash changed. Assets are
+		// not hashed (add/remove-tracked only), so they never surface here.
+		// A missing hash on either side — an old manifest predating hashing,
+		// or a path not hashed that run — cannot be judged, so it is skipped
+		// rather than reported as a false change. On the first run after an
+		// upgrade the current hashes are recorded but no modified list is
+		// produced; detection begins the run after.
+		$prev_hashes = isset( $previous_manifest['hashes'] ) && is_array( $previous_manifest['hashes'] )
+			? $previous_manifest['hashes']
+			: array();
+		$cur_hashes  = isset( $job['hashes'] ) && is_array( $job['hashes'] )
+			? array_filter( $job['hashes'], 'strlen' )
+			: array();
+
+		$modified = array();
+		foreach ( array_intersect( $previous, $current ) as $path ) {
+			if ( ! isset( $prev_hashes[ $path ], $cur_hashes[ $path ] ) ) {
+				continue;
+			}
+			if ( $prev_hashes[ $path ] !== $cur_hashes[ $path ] ) {
+				$modified[] = $path;
+			}
+		}
+
 		// Removed paths are gone from the current queue, so carry their label
 		// forward from last run's entries. That keeps the "must delete from
 		// production" list named rather than bare paths.
@@ -776,26 +825,132 @@ class Distan_Generator {
 			}
 		}
 
-		update_option(
-			self::MANIFEST_KEY,
-			array(
-				'files'    => $current,
-				'entries'  => $entries,
-				'removed'  => $removed,
-				'added'    => $added,
-				'broken'   => isset( $job['broken'] ) ? $job['broken'] : array(),
-				'cleaned'  => isset( $job['cleaned'] ) ? $job['cleaned'] : array(),
-				'dev_urls' => isset( $job['dev_urls'] ) ? $job['dev_urls'] : array(
-					'count' => 0,
-					'files' => array(),
-				),
-				'has_modules' => ! empty( $job['has_modules'] ),
-				'large_files' => isset( $job['large_files'] ) ? $job['large_files'] : array(),
-				'sitemap_missing' => isset( $job['sitemap_missing'] ) ? $job['sitemap_missing'] : array(),
-				'finished' => time(),
+		$data = array(
+			'version'  => 2,
+			'files'    => $current,
+			'hashes'   => $cur_hashes,
+			'entries'  => $entries,
+			'removed'  => $removed,
+			'added'    => $added,
+			'modified' => $modified,
+			'broken'   => isset( $job['broken'] ) ? $job['broken'] : array(),
+			'cleaned'  => isset( $job['cleaned'] ) ? $job['cleaned'] : array(),
+			'dev_urls' => isset( $job['dev_urls'] ) ? $job['dev_urls'] : array(
+				'count' => 0,
+				'files' => array(),
 			),
-			false
+			'has_modules' => ! empty( $job['has_modules'] ),
+			'large_files' => isset( $job['large_files'] ) ? $job['large_files'] : array(),
+			'sitemap_missing' => isset( $job['sitemap_missing'] ) ? $job['sitemap_missing'] : array(),
+			'finished' => time(),
 		);
+
+		// The option is always written: it powers the admin status line, and
+		// in 'output' mode it is the same-environment fallback baseline.
+		update_option( self::MANIFEST_KEY, $data, false );
+
+		if ( 'output' === $source ) {
+			self::write_output_manifest( $data );
+		}
+	}
+
+	/**
+	 * Where the diff baseline is read from and written to.
+	 *
+	 * 'db' (default) uses the WordPress option — simplest, and correct when the
+	 * site that generates is the site that is deployed. 'output' additionally
+	 * carries a portable JSON manifest inside the output tree
+	 * ({@see MANIFEST_FILE}) so the baseline travels with the deliverable when
+	 * generation and deployment happen in different environments (local or CI
+	 * generate, then upload elsewhere). Unknown values fall back to 'db'.
+	 *
+	 * @return string 'db' or 'output'.
+	 */
+	public static function manifest_source(): string {
+		/**
+		 * Filter where the diff baseline lives.
+		 *
+		 * @param string $source 'db' (default) or 'output'.
+		 */
+		$source = apply_filters( 'distan_manifest_source', 'db' );
+
+		return ( 'output' === $source ) ? 'output' : 'db';
+	}
+
+	/**
+	 * Absolute path to the portable manifest inside the output tree.
+	 */
+	private static function output_manifest_path(): string {
+		return Distan_Paths::output_root() . '/' . self::MANIFEST_FILE;
+	}
+
+	/**
+	 * Read the previous run's manifest from the chosen store.
+	 *
+	 * In 'output' mode the portable manifest is authoritative — it reflects
+	 * what the target actually holds — and falls back to the option only when
+	 * absent (a first output-mode run, or a fresh checkout with no prior tree),
+	 * which keeps same-environment continuity intact.
+	 *
+	 * @param string $source 'db' or 'output'.
+	 * @return array<string, mixed>
+	 */
+	private static function read_previous_manifest( string $source ): array {
+		if ( 'output' === $source ) {
+			$abs = self::output_manifest_path();
+
+			if ( is_readable( $abs ) ) {
+				// phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
+				$raw = file_get_contents( $abs );
+
+				if ( false !== $raw ) {
+					$decoded = json_decode( $raw, true );
+					if ( is_array( $decoded ) ) {
+						return $decoded;
+					}
+				}
+			}
+		}
+
+		$option = get_option( self::MANIFEST_KEY, array() );
+
+		return is_array( $option ) ? $option : array();
+	}
+
+	/**
+	 * Write the portable manifest and its web-deny rule into the output tree.
+	 *
+	 * Both writes go through {@see Distan_Paths::write()}, so they are
+	 * containment-checked like every other output file. The deny rule is
+	 * rewritten each run so a stripped copy self-heals.
+	 *
+	 * @param array<string, mixed> $data Manifest to persist.
+	 */
+	private static function write_output_manifest( array $data ): void {
+		$json = wp_json_encode( $data );
+
+		if ( false === $json ) {
+			return;
+		}
+
+		Distan_Paths::write( self::MANIFEST_FILE, $json );
+		Distan_Paths::write( self::META_DENY_FILE, self::meta_deny_body() );
+	}
+
+	/**
+	 * Apache deny rule for the meta directory. Other web servers need an
+	 * equivalent location rule; that is documented rather than emitted, since
+	 * the plugin cannot rewrite an arbitrary server's config safely.
+	 */
+	private static function meta_deny_body(): string {
+		return "# Distan meta — not for public serving.\n"
+			. "<IfModule mod_authz_core.c>\n"
+			. "\tRequire all denied\n"
+			. "</IfModule>\n"
+			. "<IfModule !mod_authz_core.c>\n"
+			. "\tOrder allow,deny\n"
+			. "\tDeny from all\n"
+			. "</IfModule>\n";
 	}
 
 	/**
