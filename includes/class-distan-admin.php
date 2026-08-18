@@ -28,6 +28,7 @@ class Distan_Admin {
 		add_action( 'admin_init', array( $this, 'ensure_secret' ) );
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_post_distan_download_zip', array( $this, 'download_zip' ) );
+		add_action( 'admin_post_distan_download_diff', array( $this, 'download_diff' ) );
 		add_action( 'admin_post_distan_download_report', array( $this, 'download_report' ) );
 	}
 
@@ -53,6 +54,34 @@ class Distan_Admin {
 
 		if ( null === $zip_path || ! is_file( $zip_path ) ) {
 			wp_die( esc_html__( 'ZIPの作成に失敗しました。先に生成を実行してください。', 'distan' ) );
+		}
+
+		self::stream_and_delete( $zip_path, 'application/zip' );
+	}
+
+	/**
+	 * Build and stream the differential ZIP: only the files added or changed
+	 * since the last run, plus a delete list and delivery note.
+	 */
+	public function download_diff(): void {
+		if ( ! current_user_can( Distan::capability() ) ) {
+			wp_die( esc_html__( '権限がありません。', 'distan' ), '', array( 'response' => 403 ) );
+		}
+
+		check_admin_referer( 'distan_download' );
+
+		if ( ! Distan_Report::can_zip() ) {
+			wp_die( esc_html__( 'この環境ではZIPを作成できません（ZipArchive が利用できません）。', 'distan' ) );
+		}
+
+		$manifest = Distan_Generator::manifest();
+		$zip_path = Distan_Report::build_diff_zip(
+			$manifest,
+			array( 'link_style' => Distan::settings()['link_style'] )
+		);
+
+		if ( null === $zip_path || ! is_file( $zip_path ) ) {
+			wp_die( esc_html__( '差分ZIPを作成できませんでした。前回から変わったファイルが無いか、まだ一度も生成していない可能性があります。', 'distan' ) );
 		}
 
 		self::stream_and_delete( $zip_path, 'application/zip' );
@@ -156,6 +185,7 @@ class Distan_Admin {
 			? sanitize_textarea_field( (string) $input['sitemap_exclude'] )
 			: '';
 		$out['robots']          = ! empty( $input['robots'] );
+		$out['diff_zip']        = ! empty( $input['diff_zip'] );
 		$out['enable_dispatch'] = ! empty( $input['enable_dispatch'] );
 
 		return $out;
@@ -340,8 +370,49 @@ class Distan_Admin {
 							href="<?php echo esc_url( admin_url( 'admin-post.php?action=distan_download_report&_wpnonce=' . $dl_nonce ) ); ?>">
 							<?php esc_html_e( '差分レポート（.md）', 'distan' ); ?>
 						</a>
+						<?php if ( ! empty( $settings['diff_zip'] ) && Distan_Report::can_zip() ) : ?>
+							<a class="button"
+								href="<?php echo esc_url( admin_url( 'admin-post.php?action=distan_download_diff&_wpnonce=' . $dl_nonce ) ); ?>">
+								<?php esc_html_e( '差分ZIP（変更分のみ）', 'distan' ); ?>
+							</a>
+						<?php endif; ?>
 					</div>
 				</template>
+
+				<?php if ( ! empty( $settings['diff_zip'] ) ) : ?>
+					<?php
+					$diff_source   = Distan_Generator::manifest_source();
+					$diff_manifest = Distan_Generator::manifest();
+					$diff_finished = isset( $diff_manifest['finished'] ) ? (int) $diff_manifest['finished'] : 0;
+					$diff_has_base = ! empty( $diff_manifest['files'] );
+					$diff_when     = $diff_finished > 0
+						? get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $diff_finished ), 'Y-m-d H:i' )
+						: '';
+					$diff_source_label = 'output' === $diff_source
+						? __( 'output（成果物に同梱）', 'distan' )
+						: __( 'db（データベース）', 'distan' );
+					?>
+					<p class="hgp-hint hgp-diff-status">
+						<?php
+						printf(
+							/* translators: %s: db or output */
+							esc_html__( '差分の基準: %s', 'distan' ),
+							esc_html( $diff_source_label )
+						);
+						?>
+						<?php esc_html_e( '（変更は distan_manifest_source フィルタで）', 'distan' ); ?>
+						<?php if ( '' !== $diff_when ) : ?>
+							<br>
+							<?php
+							/* translators: %s: date/time of the last generation */
+							printf( esc_html__( '前回生成: %s', 'distan' ), esc_html( $diff_when ) );
+							?>
+						<?php endif; ?>
+						<?php if ( ! $diff_has_base ) : ?>
+							<br><strong><?php esc_html_e( '前回の記録がありません。次回の生成では、すべてのページが「追加」として扱われます。', 'distan' ); ?></strong>
+						<?php endif; ?>
+					</p>
+				<?php endif; ?>
 
 				<template x-if="manifest && dispatchEnabled">
 					<div class="hgp-dispatch">
@@ -621,6 +692,21 @@ class Distan_Admin {
 								</label>
 								<p class="description">
 									<?php esc_html_e( '「すべてクロールを許可」する最小の robots.txt を書き出します。上のサイトマップが有効なときは、その場所（Sitemap:）も記載します。すでにサーバーに robots.txt を置いている場合は、オフのままにしてください。', 'distan' ); ?>
+								</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><?php esc_html_e( '差分ZIP', 'distan' ); ?></th>
+							<td>
+								<label>
+									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[diff_zip]" value="1" <?php checked( ! empty( $settings['diff_zip'] ) ); ?>>
+									<?php esc_html_e( '生成画面に「差分ZIP（変更分のみ）」のダウンロードを表示する', 'distan' ); ?>
+								</label>
+								<p class="description">
+									<?php esc_html_e( '前回の生成から追加・変更されたファイルだけをまとめた ZIP を出せます。解凍して本番の同じ場所に上げれば済むので、全体を上げ直す必要がありません。削除すべきファイルは同梱の DELETE.txt に一覧されます。オフにしてもページの変更検知は常に働くので、いつオンにしてもその時点から正しく差分が出ます。', 'distan' ); ?>
+								</p>
+								<p class="description">
+									<?php esc_html_e( '生成した環境と別のサーバーへ納品する場合は、差分の基準を成果物側に持たせる distan_manifest_source フィルタ（output）の利用を検討してください。', 'distan' ); ?>
 								</p>
 							</td>
 						</tr>

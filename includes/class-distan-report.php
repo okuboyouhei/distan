@@ -23,6 +23,13 @@ class Distan_Report {
 	public const ZIP_REPORT_NAME = 'distan-report.md';
 
 	/**
+	 * Filenames used at the root of the differential ZIP: a human-readable
+	 * delivery note, and a plain list of paths to delete from production.
+	 */
+	public const ZIP_DIFF_NOTE_NAME = 'distan-diff.md';
+	public const ZIP_DELETE_NAME    = 'DELETE.txt';
+
+	/**
 	 * Build the Markdown report for a finished run and save a timestamped
 	 * copy to the work directory (kept as history, never inside dist/).
 	 *
@@ -331,6 +338,163 @@ class Distan_Report {
 		$zip->close();
 
 		return is_file( $zip_path ) ? $zip_path : null;
+	}
+
+	/**
+	 * Build a differential ZIP: only the files added or changed since the last
+	 * run, laid out at their real relative paths so the archive unzips straight
+	 * onto production. A DELETE.txt lists paths to remove, and a short delivery
+	 * note summarises the drop. This is the sibling of {@see build_zip()} for
+	 * routine updates; the full ZIP remains for milestones and first delivery.
+	 *
+	 * Returns null when there is nothing to deliver (no adds, changes, or
+	 * deletions) or when ZIP support is unavailable.
+	 *
+	 * @param array<string, mixed> $manifest Completed manifest.
+	 * @param array<string, mixed> $meta     Extra context.
+	 * @return string|null Absolute path to the ZIP, or null.
+	 */
+	public static function build_diff_zip( array $manifest, array $meta = array() ): ?string {
+		if ( ! self::can_zip() ) {
+			return null;
+		}
+
+		$root = Distan_Paths::output_root();
+
+		if ( ! is_dir( $root ) ) {
+			return null;
+		}
+
+		$added    = isset( $manifest['added'] ) && is_array( $manifest['added'] ) ? $manifest['added'] : array();
+		$modified = isset( $manifest['modified'] ) && is_array( $manifest['modified'] ) ? $manifest['modified'] : array();
+		$removed  = isset( $manifest['removed'] ) && is_array( $manifest['removed'] ) ? $manifest['removed'] : array();
+
+		// Files to upload: everything added or changed this run, in path order,
+		// restricted to those that actually exist on disk right now.
+		$targets = array();
+		foreach ( array_values( array_unique( array_merge( $added, $modified ) ) ) as $path ) {
+			$path     = (string) $path;
+			$absolute = $root . '/' . $path;
+			if ( is_file( $absolute ) ) {
+				$targets[ $path ] = $absolute;
+			}
+		}
+
+		// Nothing changed and nothing to delete — no deliverable to build.
+		if ( empty( $targets ) && empty( $removed ) ) {
+			return null;
+		}
+
+		$work = Distan_Paths::work_root();
+
+		if ( ! Distan_Paths::ensure_dir( $work ) ) {
+			return null;
+		}
+
+		$slug     = sanitize_title( get_bloginfo( 'name' ) );
+		$slug     = '' !== $slug ? $slug : 'site';
+		$filename = $slug . '-diff-' . gmdate( 'Ymd-His' ) . '.zip';
+		$zip_path = $work . '/' . $filename;
+
+		$zip = new ZipArchive();
+
+		if ( true !== $zip->open( $zip_path, ZipArchive::CREATE | ZipArchive::OVERWRITE ) ) {
+			return null;
+		}
+
+		foreach ( $targets as $local => $absolute ) {
+			$zip->addFile( $absolute, $local );
+		}
+
+		// The delivery note and the delete list live at the ZIP root, outside
+		// the tree that unzips onto production.
+		$zip->addFromString( self::ZIP_DIFF_NOTE_NAME, self::render_diff_note( $manifest, $meta, $targets ) );
+
+		if ( ! empty( $removed ) ) {
+			$zip->addFromString( self::ZIP_DELETE_NAME, self::render_delete_list( $removed ) );
+		}
+
+		$zip->close();
+
+		return is_file( $zip_path ) ? $zip_path : null;
+	}
+
+	/**
+	 * The differential delivery note bundled at the ZIP root.
+	 *
+	 * @param array<string, mixed> $manifest Completed manifest.
+	 * @param array<string, mixed> $meta     Extra context.
+	 * @param array<string, string> $targets  Uploaded path => absolute path.
+	 */
+	private static function render_diff_note( array $manifest, array $meta, array $targets ): string {
+		$added    = isset( $manifest['added'] ) && is_array( $manifest['added'] ) ? $manifest['added'] : array();
+		$modified = isset( $manifest['modified'] ) && is_array( $manifest['modified'] ) ? $manifest['modified'] : array();
+		$removed  = isset( $manifest['removed'] ) && is_array( $manifest['removed'] ) ? $manifest['removed'] : array();
+		$entries  = isset( $manifest['entries'] ) && is_array( $manifest['entries'] ) ? $manifest['entries'] : array();
+
+		$upload_paths = array_keys( $targets );
+		$added_set    = array_flip( array_map( 'strval', $added ) );
+
+		$finished = (int) ( $manifest['finished'] ?? time() );
+		$when     = get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $finished ), 'Y-m-d H:i' );
+
+		$lines   = array();
+		$lines[] = '# Distan 差分納品';
+		$lines[] = '';
+		$lines[] = '- 生成日時: ' . $when;
+		$lines[] = '- サイト: ' . home_url( '/' );
+		$lines[] = '- アップロード対象: ' . count( $upload_paths ) . ' 件';
+		$lines[] = '- 本番から削除: ' . count( $removed ) . ' 件';
+		$lines[] = '';
+		$lines[] = 'この ZIP を本番の公開ディレクトリと同じ場所に展開してください。';
+		$lines[] = 'フォルダ構成はそのまま本番の配置に対応します。';
+		$lines[] = '';
+
+		if ( ! empty( $upload_paths ) ) {
+			$lines[] = '## アップロードするファイル';
+			$lines[] = '';
+			foreach ( $upload_paths as $path ) {
+				$tag     = isset( $added_set[ $path ] ) ? '追加' : '変更';
+				$lines[] = '- [' . $tag . '] ' . self::describe( (string) $path, $entries );
+			}
+			$lines[] = '';
+		}
+
+		if ( ! empty( $removed ) ) {
+			$lines[] = '## 本番から削除するファイル';
+			$lines[] = '';
+			$lines[] = '前回は納品したが今回は生成されなかったものです。`' . self::ZIP_DELETE_NAME . '` に同じ一覧があります。';
+			$lines[] = '本番サーバーから手で削除してください（この ZIP には含まれていません）。';
+			$lines[] = '';
+			foreach ( $removed as $path ) {
+				$lines[] = '- ' . self::describe( (string) $path, $entries );
+			}
+			$lines[] = '';
+		}
+
+		$lines[] = '---';
+		$lines[] = '';
+		$lines[] = '_Distan ' . DISTAN_VERSION . ' が生成しました。全体を納品したい場合は「ZIPをダウンロード」から一式を取得してください。_';
+
+		return implode( "\n", $lines ) . "\n";
+	}
+
+	/**
+	 * The plain path-per-line delete list bundled as DELETE.txt.
+	 *
+	 * @param array<int, string> $removed Paths removed since the last run.
+	 */
+	private static function render_delete_list( array $removed ): string {
+		$lines   = array();
+		$lines[] = '# 本番サーバーから削除してください';
+		$lines[] = '# 前回は納品したが今回は生成されなかったファイルです。';
+		$lines[] = '# 1 行 1 パス。公開ディレクトリからの相対パスです。';
+		$lines[] = '';
+		foreach ( $removed as $path ) {
+			$lines[] = (string) $path;
+		}
+
+		return implode( "\n", $lines ) . "\n";
 	}
 
 	/**
