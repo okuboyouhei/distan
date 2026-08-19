@@ -19,6 +19,27 @@
 	--dsp-danger-tint: #F3E6E0;
 	--dsp-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
+	/* Type scale — the packing-slip register. Data/labels in mono, prose in the
+	   admin sans. Kept to a small, intentional set so nothing drifts off-scale. */
+	--fs-h1: 23px;      /* page title */
+	--fs-card: 16px;    /* card / modal heading */
+	--fs-body: 13px;    /* body, section headings (~1.1x is the section rule) */
+	--fs-meta: 12px;    /* hints, secondary metadata */
+	--fs-label: 11px;   /* label-caps: pre-printed field names */
+	--fs-numeral: 27px; /* the one large figure per stat tile */
+
+	/* Line-height — headings tight, prose comfortable, numerals/icons solid. */
+	--lh-tight: 1.3;
+	--lh-body: 1.6;
+	--lh-solid: 1;
+
+	/* Spacing — the worksheet rhythm (DESIGN.md xs/sm/md/lg). */
+	--sp-xs: 6px;
+	--sp-sm: 12px;
+	--sp-md: 18px;
+	--sp-lg: 26px;
+	--sp-xl: 40px;
+
 	max-width: 1000px;
 	/* WP positions #wpfooter absolutely; keep clear of it as sections grow. */
 	padding-bottom: 72px;
@@ -45,10 +66,31 @@ body { background-color: #F0EFE3; }
 	color: var(--dsp-ink);
 }
 
+.distan-header {
+	display: flex;
+	align-items: flex-start;
+	justify-content: space-between;
+	gap: var(--sp-md);
+	flex-wrap: wrap;
+}
+
+.distan-header__titles {
+	min-width: 0;
+}
+
 .distan-lede {
 	max-width: 62ch;
 	margin: 6px 0 26px;
 	color: var(--dsp-slate);
+}
+
+/* In the header row the lede sits beside the trigger; drop its trailing gap. */
+.distan-header .distan-lede {
+	margin-bottom: 0;
+}
+
+.distan-header + .distan-subnav {
+	margin-top: var(--sp-lg);
 }
 
 /* Cards — worksheets ------------------------------------------------ */
@@ -74,7 +116,7 @@ body { background-color: #F0EFE3; }
 
 .hgp-card__head h2 {
 	margin: 0;
-	font-size: 17px;
+	font-size: var(--fs-card);
 	font-weight: 600;
 	color: var(--dsp-ink);
 	letter-spacing: .01em;
@@ -391,25 +433,25 @@ body { background-color: #F0EFE3; }
 /* Settings groups — worksheet sections divided by hairlines --------- */
 
 .hgp-settings-group {
-	margin: 32px 0 0;
-	padding-top: 16px;
+	margin: var(--sp-xl) 0 0;
+	padding-top: var(--sp-md);
 	border-top: 1px solid var(--dsp-line);
-	font-size: 13px;
+	font-size: var(--fs-body);
 	font-weight: 700;
-	color: var(--dsp-slate);
+	color: var(--dsp-ink);
 	letter-spacing: .02em;
 }
 
 .hgp-settings-group--first {
-	margin-top: 8px;
+	margin-top: var(--sp-sm);
 	padding-top: 0;
 	border-top: 0;
 }
 
 .hgp-settings-group__note {
-	margin: 4px 0 0;
+	margin: var(--sp-xs) 0 var(--sp-sm);
 	color: var(--dsp-slate);
-	font-size: 12px;
+	font-size: var(--fs-meta);
 }
 
 /* Tighten the form-table so grouped tables read as one worksheet */
@@ -433,6 +475,29 @@ body { background-color: #F0EFE3; }
 	padding-bottom: 18px;
 }
 
+/* Choice groups (radio / checkbox + inline description). Each description is
+   tucked under its own choice and indented to read as subordinate, while the
+   gap before the next choice is opened up so pairs don't clump together. */
+.distan-wrap .form-table td fieldset label {
+	display: block;
+}
+
+.distan-wrap .form-table td fieldset br {
+	display: none; /* labels are block now; the literal <br> would double-space */
+}
+
+.distan-wrap .form-table td fieldset label + label,
+.distan-wrap .form-table td fieldset .description + label {
+	margin-top: var(--sp-md);
+}
+
+.distan-wrap .form-table td fieldset .description {
+	margin: var(--sp-xs) 0 0;
+	padding-left: 24px;
+	line-height: var(--lh-body);
+	color: var(--dsp-slate);
+}
+
 /* Save button — set off with a divider so it is not missed at the
    bottom of a long settings form. */
 .hgp-settings-save {
@@ -445,7 +510,7 @@ body { background-color: #F0EFE3; }
 	padding: 4px 20px;
 	height: auto;
 	min-height: 34px;
-	font-size: 14px;
+	font-size: var(--fs-body);
 }
 
 /* --- Sticky section nav (追従ナビ) --- */
@@ -516,47 +581,50 @@ html {
    separate it from arbitrary page content beneath. Kept minimal: no
    glow, no gradient, hairline border still does the structural work. */
 
-.distan-help {
+/* Help modal — the one lifted surface in the admin (DESIGN.md's sanctioned
+   shadow), centred as a modal rather than a corner panel. */
+.distan-modal {
 	position: fixed;
-	right: 24px;
-	bottom: 24px;
-	z-index: 9999;
+	inset: 0;
+	z-index: 100000;
 	display: flex;
-	flex-direction: column;
-	align-items: flex-end;
-	gap: 10px;
+	align-items: center;
+	justify-content: center;
+	padding: 20px;
 }
 
-/* The call button — a stamp-green tab, not a round consumer FAB. */
-.distan-help__toggle {
+.distan-modal__backdrop {
+	position: fixed;
+	inset: 0;
+	background: rgba(32, 28, 22, .38);
+}
+
+/* The trigger — a quiet stamp tab in the page header. */
+.distan-help-open {
 	display: inline-flex;
 	align-items: center;
-	gap: 8px;
-	padding: 8px 14px;
+	gap: 7px;
+	padding: 6px 12px;
 	background: var(--dsp-stamp);
 	color: #fff;
 	border: 1px solid var(--dsp-stamp-dark);
 	border-radius: 2px;
-	font-size: 13px;
-	line-height: 1;
+	font-size: var(--fs-body);
+	line-height: var(--lh-solid);
 	cursor: pointer;
 }
 
-.distan-help__toggle:hover,
-.distan-help__toggle:focus {
+.distan-help-open:hover,
+.distan-help-open:focus {
 	background: var(--dsp-stamp-dark);
 }
 
-.distan-help__toggle:focus-visible {
+.distan-help-open:focus-visible {
 	outline: 2px solid var(--dsp-stamp-dark);
 	outline-offset: 2px;
 }
 
-.distan-help__toggle.is-open {
-	background: var(--dsp-stamp-dark);
-}
-
-.distan-help__mark {
+.distan-help-open__mark {
 	display: inline-flex;
 	align-items: center;
 	justify-content: center;
@@ -565,24 +633,22 @@ html {
 	border: 1px solid rgba(255, 255, 255, .8);
 	border-radius: 2px;
 	font-family: var(--dsp-mono);
-	font-size: 11px;
+	font-size: var(--fs-label);
 	font-weight: 700;
 }
 
-.distan-help__label {
-	letter-spacing: .02em;
-}
-
-/* The panel — a worksheet laid over the desk. */
+/* The dialog — a worksheet laid over the desk, lifted to hand over. */
 .distan-help__panel {
-	width: 340px;
-	max-width: calc(100vw - 48px);
-	max-height: min(70vh, 560px);
+	position: relative;
+	z-index: 1;
+	width: 560px;
+	max-width: 100%;
+	max-height: 84vh;
 	overflow-y: auto;
 	background: var(--dsp-panel);
 	border: 1px solid var(--dsp-line);
 	border-radius: 2px;
-	box-shadow: 0 6px 22px rgba(32, 28, 22, .16);
+	box-shadow: 0 10px 40px rgba(32, 28, 22, .22);
 }
 
 .distan-help__head {
@@ -599,7 +665,7 @@ html {
 
 .distan-help__title {
 	margin: 0;
-	font-size: 15px;
+	font-size: var(--fs-card);
 	font-weight: 600;
 	color: var(--dsp-ink);
 }
@@ -612,8 +678,8 @@ html {
 	border: 1px solid transparent;
 	border-radius: 2px;
 	color: var(--dsp-slate);
-	font-size: 20px;
-	line-height: 1;
+	font-size: 18px;
+	line-height: var(--lh-solid);
 	cursor: pointer;
 }
 
@@ -628,23 +694,81 @@ html {
 }
 
 .distan-help__body {
-	padding: 4px 16px 18px;
+	padding: 8px 22px 22px;
 }
 
 .distan-help__lede {
 	margin: 12px 0 4px;
 	color: var(--dsp-slate);
 	font-size: 12px;
-	line-height: 1.7;
+	line-height: var(--lh-body);
 }
 
 .distan-help__group {
-	margin: 20px 0 8px;
-	padding-top: 12px;
+	margin: 22px 0 10px;
+	padding-top: 14px;
 	border-top: 1px solid var(--dsp-line);
-	font-size: 12px;
+	font-size: var(--fs-body);
 	font-weight: 700;
 	letter-spacing: .02em;
+	color: var(--dsp-ink);
+}
+
+.distan-help__group:first-child {
+	margin-top: 8px;
+	padding-top: 0;
+	border-top: 0;
+}
+
+/* Documentation content inside the modal. */
+.distan-help__doc-p {
+	margin: 0;
+	font-size: var(--fs-body);
+	line-height: var(--lh-body);
+	color: var(--dsp-ink);
+}
+
+.distan-help__doc-steps {
+	margin: 0;
+	padding-left: 20px;
+	font-size: var(--fs-body);
+	line-height: var(--lh-body);
+	color: var(--dsp-slate);
+}
+
+.distan-help__doc-steps li {
+	margin: 0 0 10px;
+}
+
+.distan-help__doc-steps li:last-child {
+	margin-bottom: 0;
+}
+
+.distan-help__doc-steps strong {
+	display: block;
+	color: var(--dsp-ink);
+	font-weight: 600;
+}
+
+.distan-help__doc-defs {
+	margin: 0;
+}
+
+.distan-help__doc-defs dt {
+	margin-top: 14px;
+	font-size: var(--fs-body);
+	font-weight: 600;
+	color: var(--dsp-ink);
+}
+
+.distan-help__doc-defs dt:first-of-type {
+	margin-top: 0;
+}
+
+.distan-help__doc-defs dd {
+	margin: 3px 0 0;
+	font-size: var(--fs-meta);
+	line-height: var(--lh-body);
 	color: var(--dsp-slate);
 }
 
@@ -726,7 +850,7 @@ html {
 	margin: 0 0 10px;
 	color: var(--dsp-slate);
 	font-size: 12px;
-	line-height: 1.7;
+	line-height: var(--lh-body);
 }
 
 .distan-help__tips li:last-child {
@@ -756,17 +880,10 @@ html {
 	font-size: 11px;
 }
 
-/* On small screens the admin menu collapses; keep the tool reachable and
-   let the panel use the width it needs without spilling off-canvas. */
+/* On small screens let the dialog use the available width. */
 @media screen and (max-width: 782px) {
-	.distan-help {
-		right: 16px;
-		bottom: 16px;
-	}
-
 	.distan-help__panel {
-		width: calc(100vw - 32px);
-		max-height: 66vh;
+		max-height: 88vh;
 	}
 }
 
