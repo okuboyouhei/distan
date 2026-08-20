@@ -2,9 +2,9 @@
 Contributors: youheiokubo
 Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
-Tested up to: 7.0
+Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.4.0
+Stable tag: 1.4.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -93,6 +93,9 @@ Yes. Classic and block themes are both supported, including the block navigation
 Yes, with an explicit opt-in. Name the query keys that change the page with the distan_variant_keys filter, then register the specific URLs you want to ship with the distan_sources filter — usually built in a loop from the same terms or posts the page's pulldown or checkboxes are built from. Each value becomes its own static file. Because a plain static host addresses files by path only, the query is folded into the path: the published URL becomes /products/filter-chair/ rather than /products/?filter=chair. Distan does not discover these automatically — pulldown and multi-checkbox URLs are not links in the page, and their combinations are unbounded — so you decide which ones to generate. See README.md for copy-paste examples.
 
 == Changelog ==
+
+= 1.4.1 =
+* Changed: marked as tested up to WordPress 7.1.
 
 = 1.4.0 =
 * Changed: refreshed the admin screen. The help ("使い方") now opens as a centred modal from a button in the page header, instead of a floating panel in the corner, and shows a short guide to Distan and each setting. Type sizes, line heights, and spacing were tightened to a consistent scale, and the settings sections (基本設定 / 追加オプション / 公開・デプロイ) read as clearer breaks so the page is easier to scan. No change to what Distan generates.
