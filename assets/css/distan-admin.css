@@ -378,6 +378,38 @@ body { background-color: #F0EFE3; }
 	margin-bottom: 18px;
 }
 
+/* Template export — pick one page, get that page plus only the assets it
+   references, as a shell to hand an outside coder. Set off with a rule so it
+   reads as a distinct, occasional action rather than part of the download row. */
+.hgp-template {
+	margin-top: 6px;
+	padding-top: 16px;
+	border-top: 1px solid var(--dsp-line, #DED9CC);
+}
+
+.hgp-template__title {
+	margin: 0 0 4px;
+	font-size: 14px;
+	color: var(--dsp-ink, #201C16);
+}
+
+.hgp-template__note {
+	margin: 0 0 10px;
+	max-width: 62ch;
+}
+
+.hgp-template__row {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	flex-wrap: wrap;
+	margin: 0;
+}
+
+.hgp-template__row select {
+	max-width: 100%;
+}
+
 /* Dispatch — the manual "デプロイ" gate. A packing-slip footer: one action,
    two monospace facts (last generated / last dispatched). No state stored. */
 .hgp-dispatch {

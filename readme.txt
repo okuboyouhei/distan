@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.4.1
+Stable tag: 1.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -93,6 +93,10 @@ Yes. Classic and block themes are both supported, including the block navigation
 Yes, with an explicit opt-in. Name the query keys that change the page with the distan_variant_keys filter, then register the specific URLs you want to ship with the distan_sources filter — usually built in a loop from the same terms or posts the page's pulldown or checkboxes are built from. Each value becomes its own static file. Because a plain static host addresses files by path only, the query is folded into the path: the published URL becomes /products/filter-chair/ rather than /products/?filter=chair. Distan does not discover these automatically — pulldown and multi-checkbox URLs are not links in the page, and their combinations are unbounded — so you decide which ones to generate. See README.md for copy-paste examples.
 
 == Changelog ==
+
+= 1.5.0 =
+* Added: a template export. Pick one generated page and Distan hands you a ZIP of just that page plus only the assets it actually references — its CSS, JS, fonts and images, followed recursively through stylesheet url() and @import — laid out at their real relative paths so the page opens and renders as-is. It is meant for handing an outside coder a shell to build a new special page against the site's shared header and footer, without shipping the whole site's imagery. Links to other pages are expected to dangle in a one-page handoff, and a README.md at the ZIP root spells out the ground rules for the coder (leave the head/header/footer untouched, keep relative paths, add new assets under their own folder). The page selector appears on the generate screen after a run and can be turned off with the new テンプレート書き出し setting. Distan does not attempt to carve out the content region — that was the failure mode of the earlier structure map — so the full page is delivered and the coder is told which part to replace.
+* Changed: the manifest now records the environment it was generated in (site URL, site name, link style, production URL). The report, differential ZIP and template export read these from the manifest instead of asking WordPress, so a deliverable reflects the site as it was generated. In particular, changing the Production URL or link style after a run no longer disturbs an export taken from an earlier run. Manifests written before this release fall back to the current values.
 
 = 1.4.1 =
 * Changed: marked as tested up to WordPress 7.1.

@@ -31,6 +31,7 @@ Distan は公開中の全ページをループバック HTTP で巡回し、静�
 - URL パラメータでの出し分けに対応（選択制）。distan_variant_keys で表示を分けるクエリキー（例 tab, lang）を宣言すると、/slug/?tab=a と ?tab=b が独立した静的ファイル（/slug/tab-a/index.html 等）になり内部リンクも畳み込み先へ書き換わる。宣言キー以外のクエリ（utm_* 等）は無視。畳み込み形式は distan_query_variant_segment で変更可。既定オフ
 - コアサイトマップ突き合わせ（wp-sitemap をプロセス内で読み、未生成 URL をレポートに一覧。distan_use_core_sitemap で補助ソースとして列挙にも合流可、既定オフ）
 - 差分エクスポート（変更分のみ）。前回生成からの追加・変更ファイルだけを ZIP 化（本番と同じ相対パスで解凍して上書き可）。削除対象は DELETE.txt、概要は distan-diff.md。変更検知はページ HTML の内容ハッシュ（パス不変でも中身変化を検出、アセットは追加/削除で追跡）。全体 ZIP は初回・節目用に残置。差分の基準は distan_manifest_source で db（既定・単一環境）/ output（成果物同梱の携行 manifest .distan/manifest.json、生成とデプロイが別環境のとき）を選択。既定 db で挙動は不変
+- テンプレート書き出し。生成済みページを 1 枚選ぶと、そのページ＋参照アセットのみ（CSS・JS・フォント・画像、url()・@import も再帰追従）を本番と同じ相対パスで ZIP 化（Distan_Report::build_template_zip）。共通ヘッダー・フッターに沿った特設ページ制作を外部委託する際の雛形。全ページ分の素材は同梱せず、ナビ遷移先ページは 1 枚納品では欠落する前提。ZIP ルートに制作者向け README.md 同梱（head/header/footer 不可侵・本文のみ差し替え・相対パス維持）。本文領域の切り出しはしない。生成画面の「テンプレート書き出し」設定（既定オン）で表示切替
 - 生成完了フック（distan_after_generate）で自動デプロイに接続（Distan自体はデプロイしない）
 - デプロイフック（distan_dispatch）は目視確認後の手動ボタンで発火する人間のゲート。承認状態は持たず最終デプロイ時刻のみ記録。既定オフ
 
