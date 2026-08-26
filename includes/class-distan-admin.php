@@ -29,6 +29,7 @@ class Distan_Admin {
 		add_action( 'admin_init', array( $this, 'register_settings' ) );
 		add_action( 'admin_post_distan_download_zip', array( $this, 'download_zip' ) );
 		add_action( 'admin_post_distan_download_diff', array( $this, 'download_diff' ) );
+		add_action( 'admin_post_distan_download_template', array( $this, 'download_template' ) );
 		add_action( 'admin_post_distan_download_report', array( $this, 'download_report' ) );
 	}
 
@@ -47,10 +48,7 @@ class Distan_Admin {
 		}
 
 		$manifest = Distan_Generator::manifest();
-		$zip_path = Distan_Report::build_zip(
-			$manifest,
-			array( 'link_style' => Distan::settings()['link_style'] )
-		);
+		$zip_path = Distan_Report::build_zip( $manifest );
 
 		if ( null === $zip_path || ! is_file( $zip_path ) ) {
 			wp_die( esc_html__( 'ZIPの作成に失敗しました。先に生成を実行してください。', 'distan' ) );
@@ -75,13 +73,43 @@ class Distan_Admin {
 		}
 
 		$manifest = Distan_Generator::manifest();
-		$zip_path = Distan_Report::build_diff_zip(
-			$manifest,
-			array( 'link_style' => Distan::settings()['link_style'] )
-		);
+		$zip_path = Distan_Report::build_diff_zip( $manifest );
 
 		if ( null === $zip_path || ! is_file( $zip_path ) ) {
 			wp_die( esc_html__( '差分ZIPを作成できませんでした。前回から変わったファイルが無いか、まだ一度も生成していない可能性があります。', 'distan' ) );
+		}
+
+		self::stream_and_delete( $zip_path, 'application/zip' );
+	}
+
+	/**
+	 * Build and stream the template ZIP: one chosen page plus only the assets
+	 * it references, for handing to an external coder as a page shell.
+	 */
+	public function download_template(): void {
+		if ( ! current_user_can( Distan::capability() ) ) {
+			wp_die( esc_html__( '権限がありません。', 'distan' ), '', array( 'response' => 403 ) );
+		}
+
+		check_admin_referer( 'distan_download' );
+
+		if ( ! Distan_Report::can_zip() ) {
+			wp_die( esc_html__( 'この環境ではZIPを作成できません（ZipArchive が利用できません）。', 'distan' ) );
+		}
+
+		// Nonce verified above; a distinct name avoids the reserved 'page' var.
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		$page = isset( $_GET['page_path'] ) ? sanitize_text_field( wp_unslash( $_GET['page_path'] ) ) : '';
+
+		if ( '' === $page ) {
+			wp_die( esc_html__( 'テンプレートにするページが指定されていません。', 'distan' ) );
+		}
+
+		$manifest = Distan_Generator::manifest();
+		$zip_path = Distan_Report::build_template_zip( $page, $manifest );
+
+		if ( null === $zip_path || ! is_file( $zip_path ) ) {
+			wp_die( esc_html__( 'テンプレートZIPを作成できませんでした。指定したページが生成物に見つからない可能性があります。先に生成を実行してください。', 'distan' ) );
 		}
 
 		self::stream_and_delete( $zip_path, 'application/zip' );
@@ -186,6 +214,7 @@ class Distan_Admin {
 			: '';
 		$out['robots']          = ! empty( $input['robots'] );
 		$out['diff_zip']        = ! empty( $input['diff_zip'] );
+		$out['template_export'] = ! empty( $input['template_export'] );
 		$out['enable_dispatch'] = ! empty( $input['enable_dispatch'] );
 
 		return $out;
@@ -424,6 +453,49 @@ class Distan_Admin {
 							<br><strong><?php esc_html_e( '前回の記録がありません。次回の生成では、すべてのページが「追加」として扱われます。', 'distan' ); ?></strong>
 						<?php endif; ?>
 					</p>
+				<?php endif; ?>
+
+				<?php if ( ! empty( $settings['template_export'] ) && Distan_Report::can_zip() ) : ?>
+					<?php
+					$tpl_manifest = Distan_Generator::manifest();
+					$tpl_files    = isset( $tpl_manifest['files'] ) && is_array( $tpl_manifest['files'] ) ? $tpl_manifest['files'] : array();
+					$tpl_entries  = isset( $tpl_manifest['entries'] ) && is_array( $tpl_manifest['entries'] ) ? $tpl_manifest['entries'] : array();
+
+					// Only real HTML pages make sense as a shell.
+					$tpl_pages = array();
+					foreach ( $tpl_files as $tpl_file ) {
+						$tpl_file = (string) $tpl_file;
+						if ( preg_match( '#\.html?$#i', $tpl_file ) ) {
+							$tpl_pages[] = $tpl_file;
+						}
+					}
+					sort( $tpl_pages );
+					?>
+					<?php if ( ! empty( $tpl_pages ) ) : ?>
+						<form class="hgp-template" method="get" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+							<input type="hidden" name="action" value="distan_download_template">
+							<?php wp_nonce_field( 'distan_download' ); ?>
+							<h3 class="hgp-template__title"><?php esc_html_e( 'テンプレート書き出し', 'distan' ); ?></h3>
+							<p class="hgp-hint hgp-template__note">
+								<?php esc_html_e( '選んだ1ページと、それが参照するアセット（CSS・JS・フォント・画像）だけをまとめた ZIP を作ります。共通ヘッダー・フッターに沿った特設ページの制作を外部に依頼するときの雛形として渡せます。ナビ等のリンク先ページや、他ページ専用の素材は含まれません。', 'distan' ); ?>
+							</p>
+							<p class="hgp-template__row">
+								<label class="screen-reader-text" for="distan-template-page"><?php esc_html_e( 'テンプレートにするページ', 'distan' ); ?></label>
+								<select id="distan-template-page" name="page_path">
+									<?php foreach ( $tpl_pages as $tpl_page ) : ?>
+										<?php
+										$tpl_label = $tpl_page;
+										if ( isset( $tpl_entries[ $tpl_page ]['label'] ) && '' !== (string) $tpl_entries[ $tpl_page ]['label'] ) {
+											$tpl_label = (string) $tpl_entries[ $tpl_page ]['label'] . ' — ' . $tpl_page;
+										}
+										?>
+										<option value="<?php echo esc_attr( $tpl_page ); ?>"><?php echo esc_html( $tpl_label ); ?></option>
+									<?php endforeach; ?>
+								</select>
+								<button type="submit" class="button"><?php esc_html_e( 'このページで書き出す', 'distan' ); ?></button>
+							</p>
+						</form>
+					<?php endif; ?>
 				<?php endif; ?>
 
 				<template x-if="manifest && dispatchEnabled">
@@ -719,6 +791,18 @@ class Distan_Admin {
 								</p>
 								<p class="description">
 									<?php esc_html_e( '生成した環境と別のサーバーへ納品する場合は、差分の基準を成果物側に持たせる distan_manifest_source フィルタ（output）の利用を検討してください。', 'distan' ); ?>
+								</p>
+							</td>
+						</tr>
+						<tr>
+							<th scope="row"><?php esc_html_e( 'テンプレート書き出し', 'distan' ); ?></th>
+							<td>
+								<label>
+									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[template_export]" value="1" <?php checked( ! empty( $settings['template_export'] ) ); ?>>
+									<?php esc_html_e( '生成画面に「テンプレート書き出し」を表示する', 'distan' ); ?>
+								</label>
+								<p class="description">
+									<?php esc_html_e( '生成済みのページを1枚選ぶと、そのページと、それが参照している CSS・JS・フォント・画像だけをまとめた ZIP を出せます。共通ヘッダー・フッターに沿った特設ページの制作を外部に依頼するときの雛形として渡せます。参照アセットのみを同梱するので、ナビの遷移先ページや他ページ専用の素材は含まれません。ZIP のルートには制作者向けの README.md（触ってよい範囲・相対パスの注意など）を同梱します。', 'distan' ); ?>
 								</p>
 							</td>
 						</tr>

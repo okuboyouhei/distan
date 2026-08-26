@@ -39,6 +39,16 @@ WordPress を制作環境として使い、納品できる静的 HTML を書き�
 
 **この判定が壊れると、生成は成功したように見えるのに出力だけ汚れます。** 無言の失敗なので、変更時は生成物に `<meta name="generator">` が出ていないことを必ず確認してください。
 
+### 5. 成果物を消費する層は manifest だけを読む
+
+工房（＝WordPress）と成果物（＝`dist/`）を分けます。列挙器・生成器・変換レイヤーが「工房アダプタ」で、そこから下流のレポート・差分・テンプレート書き出し（`Distan_Report`）は「consumer」です。**consumer は完成した成果物（`dist/` と manifest）だけを読み、工房＝WordPress に戻って事実を取りに行きません。**
+
+manifest は成果物の自己記述です。コンテンツ事実（`files` / `hashes` / `entries` / `finished`）に加えて、生成時点の環境事実（`site` / `name` / `link_style` / `site_url`）を `write_manifest()` で刻みます。consumer が要る「サイト URL・サイト名・リンク書式・本番 URL」はこの manifest から読みます。`Distan_Report` の `manifest_site()` / `site_slug()` / `link_style_of()` / `artifact_origins()` がその窓口で、`home_url()` / `get_bloginfo()` / `Distan::settings()` を直接呼ぶのは、これらのフォールバック内（旧 manifest 用）だけに閉じ込めてあります。
+
+これは純度の話ではなく実害の予防です。生成後に本番 URL やリンク書式の設定を変えてからエクスポートしても、consumer は manifest 由来で解釈するので、**成果物は常に「生成された時の姿」で読まれます**。live 設定を見ていると、絶対 URL 指定モードで本番オリジンを剥がし損ね、テンプレート書き出しのアセットが解決できない、といった食い違いが起きます。
+
+consumer 側の機能を足すときの試金石は 2 つ。「これは工房に触るのか、成果物に触るのか」。そして「工房（WordPress）を差し替えたら、これは壊れるか」。壊れる部分は工房アダプタに寄せ、壊れない部分は成果物だけに依存させます。成果物を読むはずの処理が `home_url()` 等を呼び始めたら、継ぎ目を溶かし始めた合図です。
+
 ## クラス構成
 
 | クラス | 責務 |

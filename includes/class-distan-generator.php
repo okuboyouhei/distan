@@ -843,6 +843,14 @@ class Distan_Generator {
 			'large_files' => isset( $job['large_files'] ) ? $job['large_files'] : array(),
 			'sitemap_missing' => isset( $job['sitemap_missing'] ) ? $job['sitemap_missing'] : array(),
 			'finished' => time(),
+			// Environment facts, stamped as-generated so consumers (report,
+			// diff, template export) can interpret the artifact by reading the
+			// manifest instead of asking WordPress. A setting changed after
+			// this run must not retroactively change how the artifact reads.
+			'site'       => home_url( '/' ),
+			'name'       => get_bloginfo( 'name' ),
+			'link_style' => Distan::settings()['link_style'],
+			'site_url'   => (string) Distan::settings()['site_url'],
 		);
 
 		// The option is always written: it powers the admin status line, and

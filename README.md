@@ -95,11 +95,16 @@ Distan は、これを WordPress で解決します。`get_header()` と `get_te
 
 ## インストール
 
-1. [Releases](../../releases) から ZIP をダウンロード
-2. 管理画面 → プラグイン → 新規追加 → プラグインのアップロード
-3. 有効化
+管理画面からアップロードして有効化します。
 
-または `wp-content/plugins/` に `git clone` してください。
+1. 配布 ZIP `distan_x.y.z.zip` を用意します（[Releases](../../releases) から。まだ公開前であれば制作会社から受け取った ZIP をそのまま使えます）
+2. 管理画面 → プラグイン → 新規追加 → **プラグインのアップロード**
+3. ZIP を選択 → 今すぐインストール
+4. 有効化
+
+`.zip` を解凍する必要はありません。アップロードするのは `distan_x.y.z.zip`（フォルダ名 `distan/`）で、リポジトリを丸ごと固めた `distan-main.zip` ではありません。
+
+> **開発者向け:** ソースを直接扱う場合は `wp-content/plugins/distan/` に `git clone` してください。
 
 ---
 
@@ -207,6 +212,18 @@ WordPress は制作側に残り続け、更新のたびにここから生成し�
 
 ---
 
+## テンプレート書き出し（外部コーダーへの受け渡し）
+
+共通のヘッダー・フッターに沿った特設ページを、外部のコーダーに作ってもらう場面のための書き出しです。生成画面でページを 1 枚選ぶと、**そのページと、そのページが実際に参照するアセットだけ**（CSS・JS・フォント・画像。スタイルシートの `url()` と `@import` も辿ります）を、本番と同じ相対配置でまとめた ZIP を出します。ZIP のルートには、制作者向けの `README.md`（head・ヘッダー・フッターは触らない、本文だけ差し替える、相対パスを保つ、といった約束事）が入ります。
+
+- **全ページ分のアセットは同梱しません。** 渡したいのは共通の見た目（ヘッダー・フッター・head）であって、他ページの画像ではないためです。参照しているものだけを、生成済みの成果物から辿って集めます。
+- **本文領域を機械的に切り出すことはしません。** ページを丸ごと渡し、差し替える箇所は README で指示します。切り出しは「静かに壊れる」失敗になりがちですが、参照アセットの取りこぼしはプレビューを開けば見た目が崩れてすぐ気づけます。
+- **ナビゲーションのリンク先ページは含まれません。** 1 枚だけの受け渡しなので、リンクは切れて当然です（本番では既存ページに繋がります）。
+
+設定の「テンプレート書き出し」で表示を切り替えられます（既定は表示）。
+
+---
+
 ## バックアップとして使う
 
 WordPress で運用中のサイトの「保険」としても使えます。
@@ -223,7 +240,7 @@ WordPress で運用中のサイトの「保険」としても使えます。
 
 ## Markdown 書き出し（AI ツール向け）
 
-設定で「Markdown を書き出す」を有効にすると、全ページの本文を 1 つの Markdown ファイル（`content.md`）にまとめて、出力先に書き出します。Gemini Notebook（旧NotebookLM）などの AI ツールにサイト全体を読み込ませ、内容を自然言語で질問する用途を想定しています。
+設定で「Markdown を書き出す」を有効にすると、全ページの本文を 1 つの Markdown ファイル（`content.md`）にまとめて、出力先に書き出します。Gemini Notebook（旧NotebookLM）などの AI ツールにサイト全体を読み込ませ、内容を自然言語で質問する用途を想定しています。
 
 - ヘッダー・ナビゲーション・フッター・サイドバー・フォームは除き、`<main>`（無ければ `<article>` や本文コンテナ）の**本文だけ**を抽出します。ページごとに見出しと URL を付けて連結します。
 - 静的 HTML の生成と同じ巡回で本文を取得するため、追加のクロールは発生しません。
@@ -237,6 +254,24 @@ add_filter( 'distan_markdown_region', function ( $html ) {
     return preg_replace( '#<div class="ad-banner">.*?</div>#is', '', $html );
 } );
 ```
+
+## サイトマップと robots.txt
+
+どちらも既定はオフです。納品先で使う場合に、設定で有効にします。
+
+**sitemap.xml** — 生成したページから標準形式の `sitemap.xml` を書き出します。Google Search Console に登録できる形式です。載るのは実際に生成したページだけで、404 は含まれません。URL は公開 URL（サイト URL 設定）、`lastmod` は投稿の更新日時です。著者・日付アーカイブは生成対象外なので、`?author=1` のような ID がサイトマップに載ることはありません。
+
+- 除外は設定の「サイトマップから除外する（1 行に 1 つ）」で指定します。各パターンは 2 通りに照合され、`/private/` のように `/` で始めれば前方一致（そのスラッグ配下すべて）、`draft` のようにただの語なら部分一致（その語をパスに含む URL すべて）です。`distan_sitemap_exclude` フィルタでも足せます。
+- 最終的なエントリは `distan_sitemap_entries` フィルタで差し替えられます。
+
+**robots.txt** — 有効にすると、最小限の `robots.txt`（`User-agent: *` ／ `Allow: /`）を dist の直下に書き出します。sitemap.xml がオンのときだけ `Sitemap:` 行を足すので、存在しないファイルを指すことはありません。内容は `distan_robots` ／ `distan_robots_lines` フィルタで調整できます。
+
+### コア sitemap との照合
+
+WordPress コア（5.5 以降）自身が持つ `wp-sitemap` を基準に、列挙の取りこぼしを 2 通りの形で扱えます。
+
+- **カバレッジ診断（自動・助言のみ）** — コアの sitemap が挙げているのに今回の生成で出力されなかった URL を、生成レポートに「コア sitemap にあって未生成のURL」として一覧します。リンクを辿るだけの列挙では拾えない、プラグインが登録したルートなどを可視化するためのものです。勝手に追加はしません（リンク監査と同じ「沈黙させず、見せる」姿勢です）。
+- **列挙のシード（任意・既定オフ）** — `distan_use_core_sitemap` を有効にすると、コアの sitemap の URL を生成キューに流し込み、リンクからは辿れないページも生成対象に含めます。既定でオフなのは、コアの sitemap が noindex を含みうることと、規模が大きくなりうるためで、取り込む URL 数は `distan_sitemap_audit_max_pages`（既定 50）で上限を掛けます。
 
 ## フィルタ
 
@@ -269,7 +304,7 @@ add_filter( 'distan_url_replacements', function ( $pairs ) {
 
 利用できるフィルタ:
 
-`distan_capability` `distan_collect` `distan_post_types` `distan_taxonomies` `distan_archive_max_pages` `distan_term_max_pages` `distan_404_probe` `distan_head_actions` `distan_dequeue_handles` `distan_remove_global_styles` `distan_robots` `distan_clean_html` `distan_flatten_theme` `distan_uploads_dir` `distan_blocked_extensions` `distan_clean_output` `distan_url_replacements` `distan_sources` `distan_variant_keys` `distan_query_variant_segment`
+`distan_capability` `distan_collect` `distan_post_types` `distan_taxonomies` `distan_sources` `distan_variant_keys` `distan_query_variant_segment` `distan_archive_max_pages` `distan_term_max_pages` `distan_404_probe` `distan_head_actions` `distan_dequeue_handles` `distan_remove_global_styles` `distan_robots` `distan_robots_lines` `distan_clean_html` `distan_clean_output` `distan_flatten_theme` `distan_uploads_dir` `distan_extra_assets` `distan_blocked_extensions` `distan_large_file_threshold` `distan_url_replacements` `distan_markdown_region` `distan_manifest_source` `distan_use_core_sitemap` `distan_sitemap_entries` `distan_sitemap_exclude` `distan_sitemap_audit_max_pages` `distan_job_stale_after`
 
 ### 構造化データ（JSON-LD）について
 
@@ -345,7 +380,7 @@ Distan 自体はデプロイを行いません。ファイルを出力ディレ�
 
 ```php
 /**
- * @param array  $manifest    files / added / removed / broken / cleaned / has_modules / finished
+ * @param array  $manifest    files / added / modified / removed / broken / cleaned / finished ほか
  * @param string $output_root 出力ディレクトリの絶対パス（uploads/distan/dist）
  */
 add_action( 'distan_after_generate', function ( $manifest, $output_root ) {
@@ -372,7 +407,7 @@ add_action( 'distan_after_generate', function ( $manifest, $output_root ) {
 
 ```php
 /**
- * @param array $manifest      files / added / removed / broken / cleaned / finished
+ * @param array $manifest      files / added / modified / removed / broken / cleaned / finished ほか
  * @param int   $dispatched_at デプロイ時刻（Unix time）
  */
 add_action( 'distan_dispatch', function ( $manifest, $dispatched_at ) {

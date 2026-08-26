@@ -3,7 +3,7 @@
  * Plugin Name: Distan
  * Plugin URI:  https://github.com/okuboyouhei/distan
  * Description: dist で開発する、WordPress静的サイトジェネレーター。HTML納品案件のために、WordPressを制作環境として使い、余計なものを含まない静的HTMLを書き出します。
- * Version:     1.4.1
+ * Version:     1.5.0
  * Author:      Youhei Okubo
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'DISTAN_VERSION', '1.4.1' );
+define( 'DISTAN_VERSION', '1.5.0' );
 define( 'DISTAN_FILE', __FILE__ );
 define( 'DISTAN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DISTAN_URL', plugin_dir_url( __FILE__ ) );
@@ -119,6 +119,7 @@ final class Distan {
 			'sitemap_exclude' => '',    // Newline-separated slug prefixes (/private/) or substrings (draft) to exclude.
 			'robots'          => false, // Write a minimal robots.txt (Allow: /, plus Sitemap: when sitemap is on).
 			'diff_zip'        => true,  // Offer the differential ZIP download (changed files only). Hashing runs regardless.
+			'template_export' => true,  // Offer the per-page template ZIP (one page + only its referenced assets) for external handoff.
 			'enable_dispatch' => false, // Show the manual "デプロイ" button that fires the distan_dispatch hook.
 		);
 	}
