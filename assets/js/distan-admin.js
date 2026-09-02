@@ -42,10 +42,11 @@
 			genTotal: 0,
 			genAssets: 0,
 			genErrors: [],
-			manifest: null,
+			manifest: data.manifest || null,
 
 			dispatchEnabled: !! data.dispatchEnabled,
 			lastDispatch: data.lastDispatch || 0,
+			lastDispatchLabel: data.lastDispatchLabel || '',
 			dispatching: false,
 			dispatchError: '',
 
@@ -145,6 +146,19 @@
 						if ( d.done ) {
 							self.manifest = d.manifest || null;
 							self.genRunning = false;
+
+							// The template-export, take-up, and diff panels are
+							// rendered server-side from the stored manifest, so a
+							// first run leaves them a step behind until the page
+							// reloads. Reload once here — the results view is
+							// restored from the manifest on load, so nothing is
+							// lost — instead of asking the operator to do it.
+							if ( self.manifest ) {
+								window.setTimeout( function () {
+									window.location.reload();
+								}, 600 );
+							}
+
 							return;
 						}
 
@@ -213,6 +227,7 @@
 						}
 
 						self.lastDispatch = json.data.dispatched_at || Math.floor( Date.now() / 1000 );
+						self.lastDispatchLabel = json.data.dispatched_label || self.lastDispatchLabel;
 					} )
 					.catch( function ( error ) {
 						self.dispatchError = String( error );

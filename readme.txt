@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.5.0
+Stable tag: 1.6.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -93,6 +93,10 @@ Yes. Classic and block themes are both supported, including the block navigation
 Yes, with an explicit opt-in. Name the query keys that change the page with the distan_variant_keys filter, then register the specific URLs you want to ship with the distan_sources filter — usually built in a loop from the same terms or posts the page's pulldown or checkboxes are built from. Each value becomes its own static file. Because a plain static host addresses files by path only, the query is folded into the path: the published URL becomes /products/filter-chair/ rather than /products/?filter=chair. Distan does not discover these automatically — pulldown and multi-checkbox URLs are not links in the page, and their combinations are unbounded — so you decide which ones to generate. See README.md for copy-paste examples.
 
 == Changelog ==
+
+= 1.6.0 =
+* Added: template markers for the template export. A page can declare, in an HTML comment, what to drop from its one-page template — `<!-- distan:no-block-styles -->` removes the block library CSS and global styles, and `<!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ -->` removes scripts and stylesheets whose output path starts with the given prefixes (directory or single file). The referenced tags are removed with the files so nothing dangles, and the marker comments are stripped from the delivered template. Distan does not guess what is unused; it acts on what the template declares.
+* Added: take-up of uncovered URLs. Enumeration reads the database, so it cannot know about URLs a plugin registers dynamically — a form's thank-you page, a virtual route. Distan already surfaces these (WordPress core's sitemap declares them, or a generated page links to them), but acting on the gap used to mean hand-writing a distan_sources filter. The generate screen now shows those uncovered URLs and lets you decide per URL: include it on the next run, stop offering it, or leave it pending. The default is opt-in — nothing is taken up unless you choose it, so a page the site should not ship never sneaks into the deliverable — and your decisions are remembered, so you do not pick the same URLs again every time. A free-text box takes any other same-site URL you want generated (for example one you spotted in the broken-links report). Taken-up URLs join the queue on the same footing as distan_sources: counted, deduplicated, and shown in the diff like any other page.
 
 = 1.5.0 =
 * Added: a template export. Pick one generated page and Distan hands you a ZIP of just that page plus only the assets it actually references — its CSS, JS, fonts and images, followed recursively through stylesheet url() and @import — laid out at their real relative paths so the page opens and renders as-is. It is meant for handing an outside coder a shell to build a new special page against the site's shared header and footer, without shipping the whole site's imagery. Links to other pages are expected to dangle in a one-page handoff, and a README.md at the ZIP root spells out the ground rules for the coder (leave the head/header/footer untouched, keep relative paths, add new assets under their own folder). The page selector appears on the generate screen after a run and can be turned off with the new テンプレート書き出し setting. Distan does not attempt to carve out the content region — that was the failure mode of the earlier structure map — so the full page is delivered and the coder is told which part to replace.

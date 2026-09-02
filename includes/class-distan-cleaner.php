@@ -224,7 +224,10 @@ class Distan_Cleaner {
 		}
 
 		// Global styles: emitted as a large inline <style> block. Kept by
-		// default for the same reason as block library styles.
+		// default because block themes rely on it; removed by the filter for
+		// a site that supplies its own CSS. Per-page removal for a hand-coded
+		// template is done at template-export time via the no-block-styles
+		// marker, so no site-wide toggle is needed here.
 		if ( apply_filters( 'distan_remove_global_styles', false ) ) {
 			wp_dequeue_style( 'global-styles' );
 			remove_action( 'wp_enqueue_scripts', 'wp_enqueue_global_styles' );
