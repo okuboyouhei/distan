@@ -543,7 +543,18 @@ class Distan_Report {
 			return null;
 		}
 
-		$assets = self::collect_page_assets( $relative, self::artifact_origins( $manifest ) );
+		$origins  = self::artifact_origins( $manifest );
+
+		// Author markers on the page decide what to strip from this one-page
+		// template: distan:no-block-styles drops the block CSS, distan:drop-assets
+		// drops scripts/styles under the given output-path prefixes. Distan does
+		// not guess — it acts on what the template declares. Clean the HTML
+		// first, then collect assets from the cleaned copy, so a dropped
+		// reference is neither shipped nor its file bundled.
+		$page_html = self::read_output_file( $relative );
+		$marks     = self::parse_template_markers( $page_html );
+		$clean     = self::clean_template_html( $page_html, self::dir_of( $relative ), $origins, $marks );
+		$assets    = self::collect_page_assets( $relative, $origins, $clean );
 
 		$work = Distan_Paths::work_root();
 
@@ -560,20 +571,139 @@ class Distan_Report {
 			return null;
 		}
 
-		// The page and its assets keep their real output-relative paths, so the
-		// archive unzips into a working local copy of that one page.
-		$zip->addFile( $page_abs, $relative );
+		// The cleaned page and its assets keep their real output-relative paths,
+		// so the archive unzips into a working local copy of that one page.
+		$zip->addFromString( $relative, $clean );
 
 		foreach ( $assets as $asset ) {
 			$zip->addFile( $root . '/' . $asset, $asset );
 		}
 
 		// The README lives at the ZIP root, outside the page tree.
-		$zip->addFromString( self::ZIP_TEMPLATE_README_NAME, self::render_template_readme( $relative, $assets, $manifest, $meta ) );
+		$zip->addFromString( self::ZIP_TEMPLATE_README_NAME, self::render_template_readme( $relative, $assets, $manifest, $meta, $marks ) );
 
 		$zip->close();
 
 		return is_file( $zip_path ) ? $zip_path : null;
+	}
+
+	/**
+	 * Read the author's template markers from the page HTML.
+	 *
+	 * `<!-- distan:no-block-styles -->` drops the block library CSS and the
+	 * global-styles block. `<!-- distan:drop-assets a/ b/c.js -->` drops the
+	 * scripts and stylesheets whose output-relative path starts with any of the
+	 * space-separated prefixes. Prefixes match the flattened output path, where
+	 * plugin and core assets keep their wp-content/plugins/… and wp-includes/…
+	 * structure (only theme and uploads are relocated).
+	 *
+	 * @param string $html Page markup.
+	 * @return array{no_block_styles: bool, drop_prefixes: array<int, string>}
+	 */
+	private static function parse_template_markers( string $html ): array {
+		$no_block = (bool) preg_match( '/<!--\s*distan:no-block-styles\s*-->/i', $html );
+
+		$prefixes = array();
+		if ( preg_match_all( '/<!--\s*distan:drop-assets\s+(.*?)-->/is', $html, $m ) ) {
+			foreach ( $m[1] as $list ) {
+				foreach ( preg_split( '/\s+/', trim( $list ) ) as $token ) {
+					$token = ltrim( trim( $token ), '/' );
+					if ( '' !== $token ) {
+						$prefixes[] = $token;
+					}
+				}
+			}
+		}
+
+		return array(
+			'no_block_styles' => $no_block,
+			'drop_prefixes'   => array_values( array_unique( $prefixes ) ),
+		);
+	}
+
+	/**
+	 * Apply the markers to the page HTML: remove the declared script/style
+	 * references (and the block CSS / global-styles when asked), then strip the
+	 * marker comments so the delivered template carries no internal
+	 * instructions. Only top-level <link>/<script> references are touched — a
+	 * kept stylesheet's own url() assets are left intact, so nothing dangles.
+	 *
+	 * @param string                                                          $html     Page markup.
+	 * @param string                                                          $page_dir Output-relative directory of the page.
+	 * @param array<int, string>                                              $origins  Same-origin prefixes for absolute refs.
+	 * @param array{no_block_styles: bool, drop_prefixes: array<int, string>} $marks    Parsed markers.
+	 */
+	private static function clean_template_html( string $html, string $page_dir, array $origins, array $marks ): string {
+		$no_block = $marks['no_block_styles'];
+		$prefixes = $marks['drop_prefixes'];
+
+		$dropped = static function ( ?string $resolved ) use ( $prefixes ): bool {
+			if ( null === $resolved ) {
+				return false;
+			}
+			foreach ( $prefixes as $prefix ) {
+				if ( str_starts_with( $resolved, $prefix ) ) {
+					return true;
+				}
+			}
+			return false;
+		};
+
+		// <link>: block library styles by handle id (no-block-styles), or any
+		// stylesheet whose href resolves under a drop prefix.
+		$html = (string) preg_replace_callback(
+			'#<link\b[^>]*>#i',
+			static function ( $tag ) use ( $no_block, $dropped, $page_dir, $origins ) {
+				$html_tag = $tag[0];
+				if ( $no_block && preg_match( '/\bid=(["\'])(?:wp-block-library|wp-block-library-theme)-css\1/i', $html_tag ) ) {
+					return '';
+				}
+				if ( preg_match( '/\bhref=(["\'])(.*?)\1/i', $html_tag, $h ) && $dropped( self::resolve_ref( $h[2], $page_dir, $origins ) ) ) {
+					return '';
+				}
+				return $html_tag;
+			},
+			$html
+		);
+
+		// <script src>: external scripts whose src resolves under a drop prefix.
+		if ( ! empty( $prefixes ) ) {
+			$html = (string) preg_replace_callback(
+				'#<script\b[^>]*\bsrc=(["\'])(.*?)\1[^>]*>\s*</script>#i',
+				static function ( $tag ) use ( $dropped, $page_dir, $origins ) {
+					return $dropped( self::resolve_ref( $tag[2], $page_dir, $origins ) ) ? '' : $tag[0];
+				},
+				$html
+			);
+		}
+
+		// The block styles are also emitted as inline <style> blocks attached to
+		// their handles (wp-block-library-inline-css, per-block styles like
+		// wp-block-paragraph-inline-css, the style/global-styles placeholders,
+		// global-styles itself, and the wp-img-auto-sizes helper). Dequeuing a
+		// handle would drop these during a full run, but a template export edits
+		// finished HTML, so each inline block is removed here by its id.
+		if ( $no_block ) {
+			$html = (string) preg_replace_callback(
+				'#<style\b[^>]*\bid=(["\'])(.*?)\1[^>]*>.*?</style>#is',
+				static function ( $tag ) {
+					$id = $tag[2];
+					if ( str_starts_with( $id, 'wp-block-' )
+						|| str_starts_with( $id, 'wp-img-auto-sizes' )
+						|| false !== strpos( $id, 'global-styles' )
+					) {
+						return '';
+					}
+					return $tag[0];
+				},
+				$html
+			);
+		}
+
+		// Strip the marker comments so no internal instruction ships.
+		$html = (string) preg_replace( '/[ \t]*<!--\s*distan:.*?-->[ \t]*\n?/is', '', $html );
+
+		return $html;
 	}
 
 	/**
@@ -586,12 +716,17 @@ class Distan_Report {
 	 * @param string             $page    Output-relative path of the page.
 	 * @param array<int, string> $origins Trailing-slashed same-origin prefixes to
 	 *                                    strip from absolute-mode references.
+	 * @param string|null        $html    Page HTML to scan; reads the file when null.
+	 *                                    Callers pass the cleaned HTML so dropped
+	 *                                    references are not collected.
 	 * @return array<int, string> Output-relative asset paths.
 	 */
-	private static function collect_page_assets( string $page, array $origins ): array {
+	private static function collect_page_assets( string $page, array $origins, ?string $html = null ): array {
 		$root = Distan_Paths::output_root();
 
-		$html = self::read_output_file( $page );
+		if ( null === $html ) {
+			$html = self::read_output_file( $page );
+		}
 
 		if ( '' === $html ) {
 			return array();
@@ -866,12 +1001,13 @@ class Distan_Report {
 	/**
 	 * The handoff README bundled at the ZIP root.
 	 *
-	 * @param string               $page     Output-relative page path.
-	 * @param array<int, string>   $assets   Bundled asset paths.
-	 * @param array<string, mixed> $manifest Completed manifest.
-	 * @param array<string, mixed> $meta     Extra context.
+	 * @param string                                                          $page     Output-relative page path.
+	 * @param array<int, string>                                              $assets   Bundled asset paths.
+	 * @param array<string, mixed>                                            $manifest Completed manifest.
+	 * @param array<string, mixed>                                            $meta     Extra context.
+	 * @param array{no_block_styles: bool, drop_prefixes: array<int, string>} $marks    Applied template markers.
 	 */
-	private static function render_template_readme( string $page, array $assets, array $manifest, array $meta ): string {
+	private static function render_template_readme( string $page, array $assets, array $manifest, array $meta, array $marks = array() ): string {
 		$link_absolute = 'absolute' === self::link_style_of( $manifest, $meta );
 
 		// 生成日時 = when the site was last built (how fresh the chrome is).
@@ -889,6 +1025,12 @@ class Distan_Report {
 		$lines[] = '- サイト: ' . self::manifest_site( $manifest );
 		$lines[] = '- テンプレートページ: `' . $page . '`';
 		$lines[] = '- 同梱アセット: ' . count( $assets ) . ' 件';
+		if ( ! empty( $marks['no_block_styles'] ) ) {
+			$lines[] = '- ブロック用スタイル（wp-block-library / global-styles）: このページの指定により除外';
+		}
+		if ( ! empty( $marks['drop_prefixes'] ) ) {
+			$lines[] = '- 除外指定（distan:drop-assets）: ' . implode( ' , ', array_map( static function ( $p ) { return '`' . $p . '`'; }, $marks['drop_prefixes'] ) );
+		}
 		$lines[] = '';
 		$lines[] = 'このZIPは、既存サイトの共通ヘッダー・フッターに合わせて新しい特設ページを制作するための雛形です。';
 		$lines[] = '`' . $page . '` が見本のHTMLで、そのページが参照しているCSS・JS・フォント・画像だけを、本番と同じ相対配置で同梱しています。';

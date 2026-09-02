@@ -136,6 +136,33 @@ body { background-color: #F0EFE3; }
 	text-shadow: none;
 }
 
+/* Button geometry — center the label optically. WordPress's default button
+   line-height leaves the text sitting a hair high, most visible on the kraft
+   primary and on Japanese glyphs. Borrowing Adobe's button discipline (one
+   fixed height, a centred label) fixes the position without touching the
+   palette: geometry only, colours and radius unchanged.
+
+   Flexbox centres the label on <button>/<a>; an <input type="submit"> cannot
+   flex its own text, so it is centred with a matching line-height instead. */
+.distan-wrap button.button,
+.distan-wrap button.button-primary,
+.distan-wrap a.button,
+.distan-wrap a.button-primary {
+	display: inline-flex;
+	align-items: center;
+	justify-content: center;
+	min-height: 34px;
+	line-height: 1;
+}
+
+.distan-wrap input.button,
+.distan-wrap input.button-primary {
+	min-height: 34px;
+	line-height: 32px;
+	padding-top: 0;
+	padding-bottom: 0;
+}
+
 .distan-wrap .button-primary:hover,
 .distan-wrap .button-primary:focus {
 	background: var(--dsp-stamp-dark);
@@ -382,20 +409,21 @@ body { background-color: #F0EFE3; }
    references, as a shell to hand an outside coder. Set off with a rule so it
    reads as a distinct, occasional action rather than part of the download row. */
 .hgp-template {
-	margin-top: 6px;
-	padding-top: 16px;
+	margin-top: var(--sp-md);
+	padding-top: var(--sp-md);
 	border-top: 1px solid var(--dsp-line, #DED9CC);
+	scroll-margin-top: 48px;
 }
 
 .hgp-template__title {
-	margin: 0 0 4px;
+	margin: 0 0 var(--sp-xs);
 	font-size: 14px;
 	color: var(--dsp-ink, #201C16);
 }
 
 .hgp-template__note {
-	margin: 0 0 10px;
-	max-width: 62ch;
+	margin: 0 0 var(--sp-sm);
+	max-width: none;
 }
 
 .hgp-template__row {
@@ -408,6 +436,76 @@ body { background-color: #F0EFE3; }
 
 .hgp-template__row select {
 	max-width: 100%;
+}
+
+/* Take-up — the coverage panel: uncovered URLs (core sitemap says exist, this
+   run did not generate) offered for opt-in inclusion. Set off like the
+   template block; three-state rows so a page is added only when chosen. */
+.hgp-takeup {
+	margin-top: var(--sp-md);
+	padding-top: var(--sp-md);
+	border-top: 1px solid var(--dsp-line, #DED9CC);
+	scroll-margin-top: 48px;
+}
+
+.hgp-takeup__title {
+	margin: 0 0 var(--sp-xs);
+	font-size: 14px;
+	color: var(--dsp-ink, #201C16);
+}
+
+.hgp-takeup__note {
+	margin: 0 0 var(--sp-sm);
+	max-width: none;
+}
+
+.hgp-takeup__table {
+	margin: 0 0 var(--sp-sm);
+	width: 100%;
+}
+
+.hgp-takeup__table td {
+	vertical-align: middle;
+	padding: var(--sp-xs) 0;
+}
+
+.hgp-takeup__url {
+	word-break: break-all;
+	padding-right: var(--sp-md);
+}
+
+.hgp-takeup__choices {
+	white-space: nowrap;
+}
+
+.hgp-takeup__choices label {
+	margin-right: 12px;
+}
+
+.hgp-takeup__extra {
+	margin: 0 0 var(--sp-sm);
+}
+
+.hgp-takeup__extra label {
+	display: block;
+	margin-bottom: var(--sp-xs);
+}
+
+.hgp-takeup__ignored {
+	margin: 0 0 var(--sp-sm);
+}
+
+.hgp-takeup__restore {
+	display: block;
+	margin: var(--sp-xs) 0;
+}
+
+.hgp-takeup__save {
+	display: flex;
+	gap: 10px;
+	align-items: center;
+	flex-wrap: wrap;
+	margin: 0;
 }
 
 /* Dispatch — the manual "デプロイ" gate. A packing-slip footer: one action,
@@ -533,9 +631,13 @@ body { background-color: #F0EFE3; }
 /* Save button — set off with a divider so it is not missed at the
    bottom of a long settings form. */
 .hgp-settings-save {
-	margin-top: 24px;
-	padding-top: 20px;
+	position: sticky;
+	bottom: 0;
+	margin-top: var(--sp-lg);
+	padding: var(--sp-md) 0;
 	border-top: 1px solid var(--dsp-line);
+	background: var(--dsp-panel);
+	z-index: 5;
 }
 
 .hgp-settings-save .button-primary {
@@ -923,4 +1025,30 @@ html {
 	.distan-help__panel {
 		transition: none !important;
 	}
+}
+
+/* Jump navigation — the help modal's headings link into the screen. Offset any
+   jumped-to element so it clears the sticky admin bar, and give the help terms
+   a quiet link affordance (dashed underline that inks on hover). */
+.distan-wrap :target,
+.distan-wrap .form-table tr[id] {
+	scroll-margin-top: 48px;
+}
+
+.distan-help__jump {
+	color: inherit;
+	text-decoration: none;
+	border-bottom: 1px dashed var(--dsp-line, #DED9CC);
+}
+
+.distan-help__jump:hover,
+.distan-help__jump:focus {
+	color: var(--dsp-stamp, #7A5A34);
+	border-bottom-color: currentColor;
+}
+
+.distan-help__doc-steps a {
+	color: var(--dsp-stamp, #7A5A34);
+	text-decoration: none;
+	border-bottom: 1px dashed currentColor;
 }

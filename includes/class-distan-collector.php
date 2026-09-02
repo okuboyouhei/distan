@@ -97,6 +97,16 @@ class Distan_Collector {
 			$items[] = $provided_item;
 		}
 
+		// Operator take-ups: URLs chosen from the coverage report (or typed in)
+		// that enumeration missed. Same footing as distan_sources — counted,
+		// deduplicated, and carrying provenance — but driven by a saved choice
+		// in the admin rather than a filter.
+		if ( class_exists( 'Distan_Takeup' ) ) {
+			foreach ( Distan_Takeup::included_items() as $takeup_item ) {
+				$items[] = $takeup_item;
+			}
+		}
+
 		// Deduplicate by output path: two URLs mapping to one file would have
 		// the later one silently overwrite the earlier.
 		$unique = self::dedupe_by_path( $items );

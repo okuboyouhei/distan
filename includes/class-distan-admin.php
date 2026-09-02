@@ -31,6 +31,7 @@ class Distan_Admin {
 		add_action( 'admin_post_distan_download_diff', array( $this, 'download_diff' ) );
 		add_action( 'admin_post_distan_download_template', array( $this, 'download_template' ) );
 		add_action( 'admin_post_distan_download_report', array( $this, 'download_report' ) );
+		add_action( 'admin_post_distan_save_takeup', array( $this, 'save_takeup' ) );
 	}
 
 	/**
@@ -113,6 +114,102 @@ class Distan_Admin {
 		}
 
 		self::stream_and_delete( $zip_path, 'application/zip' );
+	}
+
+	/**
+	 * Save the operator's take-up decisions from the coverage panel: which
+	 * uncovered URLs to include on the next run, which to stop offering, and
+	 * any extra URLs typed in by hand. Redirects back to the generate screen.
+	 */
+	public function save_takeup(): void {
+		if ( ! current_user_can( Distan::capability() ) ) {
+			wp_die( esc_html__( '権限がありません。', 'distan' ), '', array( 'response' => 403 ) );
+		}
+
+		check_admin_referer( 'distan_takeup' );
+
+		// Start from what is already remembered, then apply this form's choices
+		// on top, so decisions about URLs not shown this time are preserved.
+		$state   = Distan_Takeup::state();
+		$include = array_fill_keys( $state['include'], true );
+		$ignore  = array_fill_keys( $state['ignore'], true );
+
+		// Array input is sanitised element-by-element at the boundary, so no
+		// raw value reaches the logic below. Nonce is verified above.
+		$urls    = isset( $_POST['url'] ) && is_array( $_POST['url'] ) ? map_deep( wp_unslash( $_POST['url'] ), 'esc_url_raw' ) : array();
+		$actions = isset( $_POST['takeup'] ) && is_array( $_POST['takeup'] ) ? map_deep( wp_unslash( $_POST['takeup'] ), 'sanitize_key' ) : array();
+		$restore = isset( $_POST['restore'] ) && is_array( $_POST['restore'] ) ? map_deep( wp_unslash( $_POST['restore'] ), 'esc_url_raw' ) : array();
+		$extra   = isset( $_POST['extra'] ) ? sanitize_textarea_field( wp_unslash( $_POST['extra'] ) ) : '';
+
+		// Candidate rows: each carries a URL and a chosen action.
+		foreach ( $urls as $index => $url ) {
+			$url = esc_url_raw( (string) $url );
+
+			if ( '' === $url ) {
+				continue;
+			}
+
+			$action = isset( $actions[ $index ] ) ? sanitize_key( $actions[ $index ] ) : 'pending';
+
+			unset( $include[ $url ], $ignore[ $url ] );
+
+			if ( 'include' === $action ) {
+				$include[ $url ] = true;
+			} elseif ( 'ignore' === $action ) {
+				$ignore[ $url ] = true;
+			}
+		}
+
+		// Restore checkboxes lift a URL back out of the ignore list.
+		foreach ( $restore as $url ) {
+			unset( $ignore[ esc_url_raw( (string) $url ) ] );
+		}
+
+		// Hand-typed URLs (one per line) are added to the include list.
+		foreach ( preg_split( '/\r\n|\r|\n/', $extra ) as $line ) {
+			$line = esc_url_raw( trim( $line ) );
+			if ( '' !== $line ) {
+				$include[ $line ] = true;
+			}
+		}
+
+		Distan_Takeup::save( array_keys( $include ), array_keys( $ignore ) );
+
+		wp_safe_redirect( admin_url( 'admin.php?page=distan&distan_takeup=saved#distan-generate' ) );
+		exit;
+	}
+
+	/**
+	 * The stored manifest reduced to the fields the results view (Alpine)
+	 * reads, or null when nothing has been generated. Hashes and per-entry
+	 * provenance are dropped — the client never uses them, and they are the
+	 * heavy part of the manifest.
+	 *
+	 * @return array<string, mixed>|null
+	 */
+	private static function client_manifest(): ?array {
+		$stored = Distan_Generator::manifest();
+
+		if ( empty( $stored['files'] ) ) {
+			return null;
+		}
+
+		$finished = (int) ( $stored['finished'] ?? 0 );
+
+		return array(
+			'files'          => array_values( (array) $stored['files'] ),
+			'added'          => array_values( (array) ( $stored['added'] ?? array() ) ),
+			'cleaned'        => array_values( (array) ( $stored['cleaned'] ?? array() ) ),
+			'broken'         => array_values( (array) ( $stored['broken'] ?? array() ) ),
+			'removed'        => array_values( (array) ( $stored['removed'] ?? array() ) ),
+			'has_modules'    => ! empty( $stored['has_modules'] ),
+			'finished'       => $finished,
+			// Pre-formatted in the site's timezone, matching the server-rendered
+			// "前回生成" line and the report dates. The client shows this instead
+			// of formatting the epoch itself, which would use the browser's
+			// timezone and disagree with the rest of the screen.
+			'finished_label' => $finished > 0 ? get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $finished ), 'Y-m-d H:i' ) : '',
+		);
 	}
 
 	/**
@@ -281,6 +378,14 @@ class Distan_Admin {
 				'nonce'   => wp_create_nonce( 'distan_ajax' ),
 				'dispatchEnabled' => ! empty( Distan::settings()['enable_dispatch'] ),
 				'lastDispatch'    => (int) get_option( 'distan_last_dispatch', 0 ),
+				'lastDispatchLabel' => (int) get_option( 'distan_last_dispatch', 0 ) > 0
+					? get_date_from_gmt( gmdate( 'Y-m-d H:i:s', (int) get_option( 'distan_last_dispatch', 0 ) ), 'Y-m-d H:i' )
+					: '',
+				// The stored manifest (trimmed to the fields the results view
+				// reads) lets Alpine restore that view on a fresh load, so a
+				// reload never blanks the stats and downloads and the
+				// server-rendered panels below stay in step with them.
+				'manifest'        => self::client_manifest(),
 				'i18n'    => array(
 					'checking' => __( '確認中…', 'distan' ),
 					'failed'   => __( '確認に失敗しました。', 'distan' ),
@@ -294,7 +399,7 @@ class Distan_Admin {
 			'distan-alpine',
 			DISTAN_URL . 'assets/js/alpine.min.js',
 			array( 'distan-admin' ),
-			'3.15.12',
+			'3.17.1',
 			true
 		);
 	}
@@ -395,7 +500,7 @@ class Distan_Admin {
 				</div>
 
 				<template x-if="manifest">
-					<div class="hgp-downloads">
+					<div class="hgp-downloads" id="distan-downloads">
 						<?php $dl_nonce = wp_create_nonce( 'distan_download' ); ?>
 						<?php if ( Distan_Report::can_zip() ) : ?>
 							<a class="button button-primary"
@@ -472,7 +577,7 @@ class Distan_Admin {
 					sort( $tpl_pages );
 					?>
 					<?php if ( ! empty( $tpl_pages ) ) : ?>
-						<form class="hgp-template" method="get" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<form class="hgp-template" id="distan-template" method="get" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 							<input type="hidden" name="action" value="distan_download_template">
 							<?php wp_nonce_field( 'distan_download' ); ?>
 							<h3 class="hgp-template__title"><?php esc_html_e( 'テンプレート書き出し', 'distan' ); ?></h3>
@@ -498,6 +603,119 @@ class Distan_Admin {
 					<?php endif; ?>
 				<?php endif; ?>
 
+				<?php
+				$takeup_manifest = Distan_Generator::manifest();
+				$takeup_missing  = ( isset( $takeup_manifest['sitemap_missing'] ) && is_array( $takeup_manifest['sitemap_missing'] ) ) ? $takeup_manifest['sitemap_missing'] : array();
+				$takeup_state    = Distan_Takeup::state();
+				$takeup_include  = array_fill_keys( $takeup_state['include'], true );
+				$takeup_ignore   = array_fill_keys( $takeup_state['ignore'], true );
+
+				// Active candidates: URLs core declares but this run did not
+				// generate, minus the ones already set to ignore (those move to
+				// the collapsed list below so they stop nagging).
+				$takeup_active = array();
+				foreach ( $takeup_missing as $missing_url ) {
+					$missing_url = (string) $missing_url;
+					if ( ! isset( $takeup_ignore[ $missing_url ] ) ) {
+						$takeup_active[] = $missing_url;
+					}
+				}
+
+				// Include URLs the current candidate list does not cover: ones
+				// taken up on an earlier run (now generated, so no longer
+				// "missing") or typed in by hand. Shown in the free-text box.
+				$takeup_extra = array();
+				foreach ( $takeup_state['include'] as $inc_url ) {
+					if ( ! in_array( $inc_url, $takeup_active, true ) ) {
+						$takeup_extra[] = $inc_url;
+					}
+				}
+
+				$takeup_ignored_list = $takeup_state['ignore'];
+
+				// Include URLs that map to no page on this site would be dropped
+				// at write time without a trace. Surface them so a typo in the
+				// free-text box fails loudly instead of silently.
+				$takeup_unresolved = array();
+				foreach ( $takeup_state['include'] as $inc_url ) {
+					if ( null === Distan_Urls::url_to_output_path( $inc_url ) ) {
+						$takeup_unresolved[] = $inc_url;
+					}
+				}
+
+				$takeup_has_panel    = ! empty( $takeup_active ) || ! empty( $takeup_extra ) || ! empty( $takeup_ignored_list );
+				?>
+				<?php if ( $takeup_has_panel ) : ?>
+					<form class="hgp-takeup" id="distan-takeup" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<input type="hidden" name="action" value="distan_save_takeup">
+						<?php wp_nonce_field( 'distan_takeup' ); ?>
+						<h3 class="hgp-takeup__title"><?php esc_html_e( '取りこぼしの取り込み', 'distan' ); ?></h3>
+						<?php
+						// Display-only flag set by the save redirect; no state changes here.
+						// phpcs:ignore WordPress.Security.NonceVerification.Recommended
+						if ( isset( $_GET['distan_takeup'] ) && 'saved' === $_GET['distan_takeup'] ) :
+							?>
+							<div class="hgp-alert is-ok"><?php esc_html_e( '取り込みの設定を保存しました。次の生成から反映されます。', 'distan' ); ?></div>
+						<?php endif; ?>
+						<p class="hgp-hint hgp-takeup__note">
+							<?php esc_html_e( 'WordPress コアのサイトマップにあるのに、今回の生成に含まれなかった URL です。プラグインが登録した完了画面など、リンクを辿るだけでは拾えないページがここに出ます。含めるものだけを選んでください（既定では何も取り込みません）。選んだ判断は記憶され、次回以降の生成に反映されます。', 'distan' ); ?>
+						</p>
+
+						<?php if ( ! empty( $takeup_active ) ) : ?>
+							<table class="hgp-table hgp-takeup__table">
+								<?php foreach ( $takeup_active as $i => $url ) : ?>
+									<?php $included = isset( $takeup_include[ $url ] ); ?>
+									<tr>
+										<td class="hgp-takeup__url"><code><?php echo esc_html( $url ); ?></code>
+											<input type="hidden" name="url[<?php echo esc_attr( (string) $i ); ?>]" value="<?php echo esc_attr( $url ); ?>">
+										</td>
+										<td class="hgp-takeup__choices">
+											<label><input type="radio" name="takeup[<?php echo esc_attr( (string) $i ); ?>]" value="pending" <?php checked( ! $included ); ?>> <?php esc_html_e( '未決', 'distan' ); ?></label>
+											<label><input type="radio" name="takeup[<?php echo esc_attr( (string) $i ); ?>]" value="include" <?php checked( $included ); ?>> <?php esc_html_e( '含める', 'distan' ); ?></label>
+											<label><input type="radio" name="takeup[<?php echo esc_attr( (string) $i ); ?>]" value="ignore"> <?php esc_html_e( '今後表示しない', 'distan' ); ?></label>
+										</td>
+									</tr>
+								<?php endforeach; ?>
+							</table>
+						<?php endif; ?>
+
+						<p class="hgp-takeup__extra">
+							<label for="distan-takeup-extra"><?php esc_html_e( 'その他のURL（1行に1つ／このサイト内のみ）', 'distan' ); ?></label>
+							<textarea id="distan-takeup-extra" name="extra" rows="3" class="large-text code" placeholder="<?php echo esc_attr( home_url( '/thanks/' ) ); ?>"><?php echo esc_textarea( implode( "\n", $takeup_extra ) ); ?></textarea>
+							<span class="hgp-hint"><?php esc_html_e( 'リンク切れレポートなどで見つけた、生成したい URL をここに足せます。ここに書いた URL は毎回の生成に含まれます。', 'distan' ); ?></span>
+						</p>
+
+						<?php if ( ! empty( $takeup_unresolved ) ) : ?>
+							<div class="hgp-alert is-warn">
+								<p><?php esc_html_e( '次のURLはこのサイト内のページに対応しないため、取り込んでも生成されません。取り消すか、正しいURLに直してください。', 'distan' ); ?></p>
+								<ul class="hgp-list">
+									<?php foreach ( $takeup_unresolved as $bad_url ) : ?>
+										<li><code><?php echo esc_html( $bad_url ); ?></code></li>
+									<?php endforeach; ?>
+								</ul>
+							</div>
+						<?php endif; ?>
+
+						<?php if ( ! empty( $takeup_ignored_list ) ) : ?>
+							<details class="hgp-details hgp-takeup__ignored">
+								<summary><?php esc_html_e( '今後表示しないにした URL', 'distan' ); ?> (<?php echo count( $takeup_ignored_list ); ?>)</summary>
+								<?php foreach ( $takeup_ignored_list as $ig_url ) : ?>
+									<label class="hgp-takeup__restore">
+										<input type="checkbox" name="restore[]" value="<?php echo esc_attr( $ig_url ); ?>">
+										<?php esc_html_e( '候補に戻す', 'distan' ); ?>
+										<code><?php echo esc_html( $ig_url ); ?></code>
+									</label>
+								<?php endforeach; ?>
+							</details>
+						<?php endif; ?>
+
+						<p class="hgp-takeup__save">
+							<button type="submit" class="button"><?php esc_html_e( '保存', 'distan' ); ?></button>
+							<span class="hgp-hint"><?php esc_html_e( '保存後、次に生成すると取り込んだ URL が含まれます。', 'distan' ); ?></span>
+						</p>
+					</form>
+				<?php endif; ?>
+
 				<template x-if="manifest && dispatchEnabled">
 					<div class="hgp-dispatch">
 						<div class="hgp-dispatch__action">
@@ -513,11 +731,11 @@ class Distan_Admin {
 						<dl class="hgp-shipmeta">
 							<div class="hgp-shipmeta__row">
 								<dt><?php esc_html_e( '最終生成', 'distan' ); ?></dt>
-								<dd x-text="fmtTime(manifest.finished)"></dd>
+								<dd x-text="manifest.finished_label || '—'"></dd>
 							</div>
 							<div class="hgp-shipmeta__row">
 								<dt><?php esc_html_e( '最終デプロイ', 'distan' ); ?></dt>
-								<dd x-text="lastDispatch ? fmtTime(lastDispatch) : '—'"></dd>
+								<dd x-text="lastDispatchLabel || '—'"></dd>
 							</div>
 						</dl>
 					</div>
@@ -640,7 +858,7 @@ class Distan_Admin {
 					<h3 class="hgp-settings-group hgp-settings-group--first"><?php esc_html_e( '基本設定', 'distan' ); ?></h3>
 					<p class="hgp-settings-group__note"><?php esc_html_e( '書き出す静的HTMLの基本設定です。案件に合わせて選んでください。', 'distan' ); ?></p>
 					<table class="form-table" role="presentation">
-						<tr>
+						<tr id="set-site-url">
 							<th scope="row">
 								<label for="distan-site-url"><?php esc_html_e( '公開URL', 'distan' ); ?></label>
 							</th>
@@ -654,7 +872,7 @@ class Distan_Admin {
 								</p>
 							</td>
 						</tr>
-						<tr>
+						<tr id="set-path-style">
 							<th scope="row"><?php esc_html_e( 'ファイル名の形式', 'distan' ); ?></th>
 							<td>
 								<fieldset>
@@ -663,7 +881,7 @@ class Distan_Admin {
 								</fieldset>
 							</td>
 						</tr>
-						<tr>
+						<tr id="set-link-style">
 							<th scope="row"><?php esc_html_e( '内部リンクの書き方', 'distan' ); ?></th>
 							<td>
 								<fieldset>
@@ -686,7 +904,7 @@ class Distan_Admin {
 								</fieldset>
 							</td>
 						</tr>
-						<tr>
+						<tr id="set-noindex">
 							<th scope="row"><?php esc_html_e( '検索エンジンの扱い', 'distan' ); ?></th>
 							<td>
 								<fieldset>
@@ -712,7 +930,7 @@ class Distan_Admin {
 								<?php endif; ?>
 							</td>
 						</tr>
-						<tr>
+						<tr id="set-clean-html">
 							<th scope="row"><?php esc_html_e( 'WordPress の痕跡を除く', 'distan' ); ?></th>
 							<td>
 								<label>
@@ -729,7 +947,7 @@ class Distan_Admin {
 						<h3 class="hgp-settings-group"><?php esc_html_e( '追加オプション', 'distan' ); ?></h3>
 						<p class="hgp-settings-group__note"><?php esc_html_e( '必要な場合だけ使うオプションです。通常の納品では設定しなくて構いません。', 'distan' ); ?></p>
 						<table class="form-table" role="presentation">
-							<tr>
+							<tr id="set-markdown">
 								<th scope="row"><?php esc_html_e( 'Markdown を書き出す', 'distan' ); ?></th>
 							<td>
 								<label>
@@ -748,7 +966,7 @@ class Distan_Admin {
 								</p>
 							</td>
 						</tr>
-						<tr>
+						<tr id="set-sitemap">
 							<th scope="row"><?php esc_html_e( 'サイトマップを書き出す', 'distan' ); ?></th>
 							<td>
 								<label>
@@ -767,7 +985,7 @@ class Distan_Admin {
 								</p>
 							</td>
 						</tr>
-						<tr>
+						<tr id="set-robots">
 							<th scope="row"><?php esc_html_e( 'robots.txt を書き出す', 'distan' ); ?></th>
 							<td>
 								<label>
@@ -779,7 +997,7 @@ class Distan_Admin {
 								</p>
 							</td>
 						</tr>
-						<tr>
+						<tr id="set-diff-zip">
 							<th scope="row"><?php esc_html_e( '差分ZIP', 'distan' ); ?></th>
 							<td>
 								<label>
@@ -794,7 +1012,7 @@ class Distan_Admin {
 								</p>
 							</td>
 						</tr>
-						<tr>
+						<tr id="set-template-export">
 							<th scope="row"><?php esc_html_e( 'テンプレート書き出し', 'distan' ); ?></th>
 							<td>
 								<label>
@@ -811,7 +1029,7 @@ class Distan_Admin {
 						<h3 class="hgp-settings-group"><?php esc_html_e( '公開・デプロイ', 'distan' ); ?></h3>
 						<p class="hgp-settings-group__note"><?php esc_html_e( '書き出したあとの公開処理を自分で繋ぐ場合のオプションです。', 'distan' ); ?></p>
 						<table class="form-table" role="presentation">
-							<tr>
+							<tr id="set-dispatch-button">
 								<th scope="row"><?php esc_html_e( 'デプロイボタン', 'distan' ); ?></th>
 							<td>
 								<label>
@@ -845,7 +1063,7 @@ class Distan_Admin {
 	 * detailed, contextual help already lives; it does not duplicate it.
 	 */
 	private function render_help(): void {
-		$doc_url = 'https://github.com/okuboyouhei/distan';
+		$doc_url = 'https://github.com/okuboyouhei/distan/blob/main/README.md';
 		?>
 		<div
 			x-data="{ open: false }"
@@ -885,46 +1103,49 @@ class Distan_Admin {
 					<h3 class="distan-help__group"><?php esc_html_e( '使い方の流れ', 'distan' ); ?></h3>
 					<ol class="distan-help__doc-steps">
 						<li>
-							<strong><?php esc_html_e( '環境を確認する', 'distan' ); ?></strong>
+							<strong><a href="#distan-env" @click="open = false"><?php esc_html_e( '環境を確認する', 'distan' ); ?></a></strong>
 							<?php esc_html_e( '「環境」タブで、書き出しに必要な条件（ループバック通信）が通るか確認します。', 'distan' ); ?>
 						</li>
 						<li>
-							<strong><?php esc_html_e( '書き出す', 'distan' ); ?></strong>
+							<strong><a href="#distan-generate" @click="open = false"><?php esc_html_e( '書き出す', 'distan' ); ?></a></strong>
 							<?php esc_html_e( '「生成」タブの「静的HTMLを書き出す」で、全ページを書き出します。', 'distan' ); ?>
 						</li>
 						<li>
-							<strong><?php esc_html_e( '受け取る・公開する', 'distan' ); ?></strong>
+							<strong><a href="#distan-downloads" @click="open = false"><?php esc_html_e( '受け取る・公開する', 'distan' ); ?></a></strong>
 							<?php esc_html_e( 'ZIP をダウンロードして納品するか、「デプロイ」で公開処理につなげます。変わった分だけ渡すなら「差分ZIP」を使います。', 'distan' ); ?>
 						</li>
 					</ol>
 
 					<h3 class="distan-help__group"><?php esc_html_e( '主な設定', 'distan' ); ?></h3>
 					<dl class="distan-help__doc-defs">
-						<dt><?php esc_html_e( '公開URL', 'distan' ); ?></dt>
+						<dt><a class="distan-help__jump" href="#set-site-url" @click="open = false"><?php esc_html_e( '公開URL', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( 'canonical と OGP に使う本番の URL。内部リンクはドキュメント相対で書き出すので、置き場所は選びません。', 'distan' ); ?></dd>
 
-						<dt><?php esc_html_e( 'ファイル名の形式', 'distan' ); ?></dt>
+						<dt><a class="distan-help__jump" href="#set-path-style" @click="open = false"><?php esc_html_e( 'ファイル名の形式', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( '/about/index.html 形式か、/about.html 形式かを選びます。', 'distan' ); ?></dd>
 
-						<dt><?php esc_html_e( '内部リンクの書き方', 'distan' ); ?></dt>
+						<dt><a class="distan-help__jump" href="#set-link-style" @click="open = false"><?php esc_html_e( '内部リンクの書き方', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( '「ドキュメント相対」は納品向け（解凍してそのまま開けます）。「公開URLで絶対指定」はバックアップ向け（ドキュメントルートに置いて表示）。', 'distan' ); ?></dd>
 
-						<dt><?php esc_html_e( '検索エンジンの扱い', 'distan' ); ?></dt>
+						<dt><a class="distan-help__jump" href="#set-noindex" @click="open = false"><?php esc_html_e( '検索エンジンの扱い', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( '本番納品では noindex を除去します。テスト環境で見せるだけなら残します。', 'distan' ); ?></dd>
 
-						<dt><?php esc_html_e( 'WordPress の痕跡を除く', 'distan' ); ?></dt>
+						<dt><a class="distan-help__jump" href="#set-clean-html" @click="open = false"><?php esc_html_e( 'WordPress の痕跡を除く', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( 'generator や絵文字などの余分な出力を省き、納品用に整えます。', 'distan' ); ?></dd>
 
-						<dt><?php esc_html_e( 'Markdown を書き出す', 'distan' ); ?></dt>
+						<dt><a class="distan-help__jump" href="#set-markdown" @click="open = false"><?php esc_html_e( 'Markdown を書き出す', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( '全ページの本文を content.md にまとめます。AI ツールにサイト内容を読ませる用途です。', 'distan' ); ?></dd>
 
-						<dt><?php esc_html_e( 'サイトマップ / robots.txt', 'distan' ); ?></dt>
+						<dt><a class="distan-help__jump" href="#set-sitemap" @click="open = false"><?php esc_html_e( 'サイトマップ / robots.txt', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( '必要なら sitemap.xml と robots.txt を書き出します。', 'distan' ); ?></dd>
 
-						<dt><?php esc_html_e( '差分ZIP', 'distan' ); ?></dt>
+						<dt><a class="distan-help__jump" href="#set-diff-zip" @click="open = false"><?php esc_html_e( '差分ZIP', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( '前回の生成から追加・変更されたファイルだけをまとめた ZIP を出せます。削除すべきファイルは同梱の DELETE.txt に一覧されます。', 'distan' ); ?></dd>
 
-						<dt><?php esc_html_e( 'デプロイ', 'distan' ); ?></dt>
+						<dt><a class="distan-help__jump" href="#set-template-export" @click="open = false"><?php esc_html_e( 'テンプレート書き出し', 'distan' ); ?></a></dt>
+						<dd><?php esc_html_e( '生成済みページを1枚選ぶと、そのページと参照アセットだけをまとめて、外部コーダー向けの雛形として渡せます。ナビの遷移先や他ページ専用の素材は含みません。', 'distan' ); ?></dd>
+
+						<dt><a class="distan-help__jump" href="#set-dispatch-button" @click="open = false"><?php esc_html_e( 'デプロイ', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( '生成物を確認したあと、自分の公開処理（git push / rsync など）を手動でつなぐためのボタンです。', 'distan' ); ?></dd>
 					</dl>
 

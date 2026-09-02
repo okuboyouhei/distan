@@ -6,6 +6,8 @@ Distan（ディスタン）は、WordPress を制作環境として使い、そ�
 
 > **English:** Distan turns WordPress into a build environment for static HTML deliverables. You author in WordPress, then export clean, self-contained HTML that runs anywhere — no WordPress, no PHP, no database on the production server. Built for agencies that hand over HTML files rather than a CMS.
 
+![WordPress は作る場所、静的 HTML が納品物。従来は WordPress ごと本番に残るが、Distan では工房（WordPress）を手元に残し、本番には静的 HTML だけを納品する。](assets/distan-concept.svg)
+
 ---
 
 ## 既存の静的化プラグインとの違い
@@ -69,7 +71,6 @@ Distan は、これを WordPress で解決します。`get_header()` と `get_te
 
 - **クライアント自身が更新する要件がある** → 素直に WordPress で納品してください
 - **フォーム・検索・コメント・会員機能が必要** → 静的化すると動きません
-- **ページが数枚しかない** → WordPress を立てるコストのほうが高くつきます
 
 ---
 
@@ -154,7 +155,7 @@ dist/
 
 `generator` / RSD / WLW / 隣接投稿の rel リンク / REST API の link タグと Link ヘッダー / oEmbed / フィードの link タグ / ショートリンク / 絵文字スクリプト / リソースヒント / X-Pingback / 投機的読み込み / `sourceURL` コメント / 開発環境の `noindex`
 
-ブロックのインライン CSS（`wp-block-*`）と `global-styles` は、レイアウトを支えているため**残します**。自前 CSS で書いている場合は `distan_remove_global_styles` フィルタで除去できます。
+ブロックのインライン CSS（`wp-block-*`）と `global-styles` は、レイアウトを支えているため既定では**残します**。ブロックを使わず、CSS を自分で書いている場合は、`distan_dequeue_handles` で `wp-block-library` を、`distan_remove_global_styles` で `global-styles` を落とせます。特設ページのように 1 ページだけ落としたい場合は、そのページのテンプレートに `<!-- distan:no-block-styles -->` マーカーを書いておけば、[テンプレート書き出し](#テンプレート書き出し外部コーダーへの受け渡し)のときにその雛形からだけ除去できます。
 
 ---
 
@@ -220,6 +221,15 @@ WordPress は制作側に残り続け、更新のたびにここから生成し�
 - **本文領域を機械的に切り出すことはしません。** ページを丸ごと渡し、差し替える箇所は README で指示します。切り出しは「静かに壊れる」失敗になりがちですが、参照アセットの取りこぼしはプレビューを開けば見た目が崩れてすぐ気づけます。
 - **ナビゲーションのリンク先ページは含まれません。** 1 枚だけの受け渡しなので、リンクは切れて当然です（本番では既存ページに繋がります）。
 
+### 不要なアセットを雛形から外す
+
+自前でテンプレートを組む場合、WordPress の既定スタイルやプラグインの JS が、使っていないのに出力に残ることがあります。テンプレートページの HTML にマーカーを書いておくと、テンプレート書き出しがその 1 枚の雛形から該当アセットを外します。Distan は中身を推測しません。テンプレートに書かれた指定にだけ従います。
+
+- `<!-- distan:no-block-styles -->` — ブロックエディタの標準スタイルと theme.json 由来のスタイルを、この雛形から外します。`wp-block-library` の `<link>` に加え、WordPress が個別に吐く `wp-block-*` / `global-styles` 系のインライン `<style>`（`wp-block-library-inline-css` やブロックごとの `wp-block-*-inline-css`、各プレースホルダ）も対象です。画像の `sizes=auto` 用ヘルパー（`wp-img-auto-sizes-*`）のインライン `<style>` も対象です。
+- `<!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ -->` — スペース区切りで書いたパスの**前方一致**で、スクリプトとスタイルシートを外します。ディレクトリ（`wp-includes/`）でもファイル単体でも指定できます。テーマのアセットは `assets/`、アップロードは `media/` に配置され、プラグインやコアのアセットは `wp-content/plugins/…`・`wp-includes/…` のまま残るので、その構造で指定します。
+
+外したアセットは、参照している `<link>` / `<script>` タグごと雛形から取り除かれるため、リンク切れは残りません。マーカーのコメント自体も、渡す雛形からは除去されます。何を外したかは同梱の README.md に記録されます。
+
 設定の「テンプレート書き出し」で表示を切り替えられます（既定は表示）。
 
 ---
@@ -272,6 +282,20 @@ WordPress コア（5.5 以降）自身が持つ `wp-sitemap` を基準に、列�
 
 - **カバレッジ診断（自動・助言のみ）** — コアの sitemap が挙げているのに今回の生成で出力されなかった URL を、生成レポートに「コア sitemap にあって未生成のURL」として一覧します。リンクを辿るだけの列挙では拾えない、プラグインが登録したルートなどを可視化するためのものです。勝手に追加はしません（リンク監査と同じ「沈黙させず、見せる」姿勢です）。
 - **列挙のシード（任意・既定オフ）** — `distan_use_core_sitemap` を有効にすると、コアの sitemap の URL を生成キューに流し込み、リンクからは辿れないページも生成対象に含めます。既定でオフなのは、コアの sitemap が noindex を含みうることと、規模が大きくなりうるためで、取り込む URL 数は `distan_sitemap_audit_max_pages`（既定 50）で上限を掛けます。
+
+### 取りこぼしの取り込み
+
+列挙はデータベースを読むので、プラグインが動的に登録する URL（フォームの完了画面、仮想的なルートなど）を知りません。上の照合やリンク切れレポートでその存在は見えますが、生成対象に足すには `distan_sources` フィルタを手で書く必要がありました。
+
+生成画面の「取りこぼしの取り込み」は、この判断を URL ごとに記録します。コア sitemap にあって未生成の URL が候補として並び、それぞれを次の 3 つから選べます。
+
+- **含める** — 次回以降の生成に追加します（`distan_sources` と同じ扱いで、カウントされ、重複排除され、差分にも出ます）。
+- **今後表示しない** — 候補として二度と出しません。納品物に入れたくない内部ページなどに。
+- **未決** — 今回は保留。次回もまた候補に出ます。
+
+既定はオプトインで、選んだものだけが取り込まれます。何もしなければ何も足されないので、書き出したくない URL が勝手に混ざることはありません。選んだ判断は記憶されるので、生成のたびに選び直す必要もありません。「今後表示しない」にした URL は折りたたみの一覧から候補に戻せます。
+
+コア sitemap にも載らない URL（リンク切れレポートで気づいたものなど）は、同じパネルの自由入力欄に 1 行 1 つで足せます。ここに書いた URL は、このサイト内のものだけが毎回の生成に含まれます。
 
 ## フィルタ
 

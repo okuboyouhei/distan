@@ -136,7 +136,12 @@ class Distan_Ajax {
 
 		update_option( 'distan_last_dispatch', $now, false );
 
-		wp_send_json_success( array( 'dispatched_at' => $now ) );
+		wp_send_json_success(
+			array(
+				'dispatched_at'    => $now,
+				'dispatched_label' => get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $now ), 'Y-m-d H:i' ),
+			)
+		);
 	}
 
 	/**
