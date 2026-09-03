@@ -5,18 +5,21 @@
    See DESIGN.md for the rationale behind every token. */
 
 .distan-wrap {
-	--dsp-ink: #201C16;
-	--dsp-slate: #6A655B;
-	--dsp-line: #DED9CC;
-	--dsp-panel: #FFFFFF;
-	--dsp-ground: #F0EFE3;
-	--dsp-stamp: #7A5A34;
-	--dsp-stamp-dark: #5E4527;
-	--dsp-ok: #15654A;
-	--dsp-warn: #8A5A00;
-	--dsp-warn-tint: #F3ECD9;
-	--dsp-danger: #9E3319;
-	--dsp-danger-tint: #F3E6E0;
+	/* Colours track the WordPress admin. Neutrals use the standard admin
+	   greys; the accent follows the user's chosen colour scheme via
+	   --wp-admin-theme-color, with the default blue as a fallback. */
+	--dsp-ink: #1d2327;        /* WP admin primary text */
+	--dsp-slate: #50575e;      /* WP admin secondary text */
+	--dsp-line: #c3c4c7;       /* WP admin border */
+	--dsp-panel: #ffffff;      /* card surface */
+	--dsp-ground: #f0f0f1;     /* WP admin content background */
+	--dsp-stamp: var(--wp-admin-theme-color, #2271b1);
+	--dsp-stamp-dark: var(--wp-admin-theme-color-darker-10, #135e96);
+	--dsp-ok: #007017;         /* WP success (readable as text) */
+	--dsp-warn: #996800;       /* WP warning text */
+	--dsp-warn-tint: #fcf9e8;
+	--dsp-danger: #b32d2e;     /* WP error */
+	--dsp-danger-tint: #fcf0f1;
 	--dsp-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
 
 	/* Type scale — the packing-slip register. Data/labels in mono, prose in the
@@ -46,15 +49,6 @@
 }
 
 [x-cloak] { display: none !important; }
-
-/* Paint the desk. This stylesheet is enqueued only on the Distan screen, so
-   tinting the WordPress content canvas here is safe and scoped to this page.
-   Without it the cream ground shows only in small inset tokens and the desk
-   stays WP's default grey; painting it lets white panels read as sheets on
-   cream kraft stock, matching the book cover. Value mirrors --dsp-ground. */
-body { background-color: #F0EFE3; }
-#wpcontent,
-#wpbody-content { background-color: transparent; }
 
 /* Masthead — a job-ticket header, not a hero. Title then one calm line;
    no uppercase English tagline, no second paragraph. */
@@ -99,7 +93,7 @@ body { background-color: #F0EFE3; }
 	background: var(--dsp-panel);
 	border: 1px solid var(--dsp-line);
 	border-radius: 2px;
-	padding: 4px 24px 24px;
+	padding: var(--sp-sm) 24px 24px;
 	margin-bottom: 20px;
 }
 
@@ -118,6 +112,7 @@ body { background-color: #F0EFE3; }
 	margin: 0;
 	font-size: var(--fs-card);
 	font-weight: 600;
+	line-height: var(--lh-tight);
 	color: var(--dsp-ink);
 	letter-spacing: .01em;
 }
@@ -126,14 +121,6 @@ body { background-color: #F0EFE3; }
 	display: flex;
 	align-items: center;
 	gap: 14px;
-}
-
-/* Primary action = the inked stamp */
-.distan-wrap .button-primary {
-	background: var(--dsp-stamp);
-	border-color: var(--dsp-stamp-dark);
-	box-shadow: none;
-	text-shadow: none;
 }
 
 /* Button geometry — center the label optically. WordPress's default button
@@ -161,12 +148,6 @@ body { background-color: #F0EFE3; }
 	line-height: 32px;
 	padding-top: 0;
 	padding-bottom: 0;
-}
-
-.distan-wrap .button-primary:hover,
-.distan-wrap .button-primary:focus {
-	background: var(--dsp-stamp-dark);
-	border-color: var(--dsp-stamp-dark);
 }
 
 .hgp-batch {
@@ -208,6 +189,7 @@ body { background-color: #F0EFE3; }
 	width: 12em;
 	font-weight: 600;
 	color: var(--dsp-ink);
+	white-space: pre-line;
 }
 
 .hgp-table__status { width: 56px; }
@@ -246,8 +228,8 @@ body { background-color: #F0EFE3; }
 	color: #fff;
 }
 
-.hgp-badge.is-ok { background: var(--dsp-ok); }
-.hgp-badge.is-warning { background: var(--dsp-warn); }
+.hgp-badge.is-ok { background: var(--dsp-slate); }
+.hgp-badge.is-warning { background: var(--dsp-ink); }
 .hgp-badge.is-error { background: var(--dsp-danger); }
 
 /* Progress — a tally advancing ------------------------------------- */
@@ -305,6 +287,7 @@ body { background-color: #F0EFE3; }
 }
 
 .hgp-stat.is-warn .hgp-stat__num { color: var(--dsp-warn); }
+.hgp-stat.is-error .hgp-stat__num { color: var(--dsp-danger); }
 
 .hgp-stat__label {
 	display: block;
@@ -362,7 +345,7 @@ body { background-color: #F0EFE3; }
 .hgp-alert.is-error {
 	background: var(--dsp-danger-tint);
 	border-left: 3px solid var(--dsp-danger);
-	color: #6b2412;
+	color: var(--dsp-danger);
 }
 
 /* Settings form ----------------------------------------------------- */
@@ -379,7 +362,7 @@ body { background-color: #F0EFE3; }
 	margin: 4px 0 12px;
 	padding: 8px 12px;
 	background: var(--dsp-ink);
-	color: #EDEBE4;
+	color: var(--dsp-ground);
 	border-radius: 2px;
 	font-family: var(--dsp-mono);
 	font-size: 12px;
@@ -393,7 +376,7 @@ body { background-color: #F0EFE3; }
 	border-left: 3px solid var(--dsp-warn);
 	border-radius: 0 2px 2px 0;
 	font-size: 12px;
-	color: #6b4400;
+	color: var(--dsp-warn);
 	max-width: 62ch;
 }
 
@@ -411,14 +394,14 @@ body { background-color: #F0EFE3; }
 .hgp-template {
 	margin-top: var(--sp-md);
 	padding-top: var(--sp-md);
-	border-top: 1px solid var(--dsp-line, #DED9CC);
+	border-top: 1px solid var(--dsp-line, #c3c4c7);
 	scroll-margin-top: 48px;
 }
 
 .hgp-template__title {
 	margin: 0 0 var(--sp-xs);
 	font-size: 14px;
-	color: var(--dsp-ink, #201C16);
+	color: var(--dsp-ink, #1d2327);
 }
 
 .hgp-template__note {
@@ -444,14 +427,14 @@ body { background-color: #F0EFE3; }
 .hgp-takeup {
 	margin-top: var(--sp-md);
 	padding-top: var(--sp-md);
-	border-top: 1px solid var(--dsp-line, #DED9CC);
+	border-top: 1px solid var(--dsp-line, #c3c4c7);
 	scroll-margin-top: 48px;
 }
 
 .hgp-takeup__title {
 	margin: 0 0 var(--sp-xs);
 	font-size: 14px;
-	color: var(--dsp-ink, #201C16);
+	color: var(--dsp-ink, #1d2327);
 }
 
 .hgp-takeup__note {
@@ -459,9 +442,17 @@ body { background-color: #F0EFE3; }
 	max-width: none;
 }
 
-.hgp-takeup__table {
+.hgp-takeup__list {
+	max-height: 300px;
+	overflow-y: auto;
+	border: 1px solid var(--dsp-line);
+	border-radius: 2px;
 	margin: 0 0 var(--sp-sm);
+}
+
+.hgp-takeup__table {
 	width: 100%;
+	margin: 0;
 }
 
 .hgp-takeup__table td {
@@ -505,7 +496,7 @@ body { background-color: #F0EFE3; }
 	gap: 10px;
 	align-items: center;
 	flex-wrap: wrap;
-	margin: 0;
+	margin: 0 0 var(--sp-md);
 }
 
 /* Dispatch — the manual "デプロイ" gate. A packing-slip footer: one action,
@@ -513,7 +504,7 @@ body { background-color: #F0EFE3; }
 .hgp-dispatch {
 	margin-top: 6px;
 	padding-top: 16px;
-	border-top: 1px solid var(--dsp-rule, #E3DFD6);
+	border-top: 1px solid var(--dsp-line);
 }
 
 .hgp-dispatch__action {
@@ -592,7 +583,7 @@ body { background-color: #F0EFE3; }
    hierarchy (group > row) stays legible. */
 
 .distan-wrap .form-table tr {
-	border-bottom: 1px solid #ECEAE4;
+	border-bottom: 1px solid var(--dsp-line);
 }
 
 .distan-wrap .form-table tr:last-child {
@@ -655,9 +646,6 @@ html {
 }
 
 .distan-subnav {
-	position: sticky;
-	top: 32px; /* WordPress admin bar height (desktop) */
-	z-index: 10;
 	display: flex;
 	flex-wrap: wrap;
 	gap: 2px;
@@ -694,11 +682,6 @@ html {
 }
 
 @media screen and (max-width: 782px) {
-	/* On small screens the admin bar is not fixed; it scrolls away. */
-	.distan-subnav {
-		top: 0;
-	}
-
 	.distan-wrap .hgp-card[id] {
 		scroll-margin-top: 52px;
 	}
@@ -775,7 +758,7 @@ html {
 .distan-help__panel {
 	position: relative;
 	z-index: 1;
-	width: 560px;
+	width: 660px;
 	max-width: 100%;
 	max-height: 84vh;
 	overflow-y: auto;
@@ -916,7 +899,7 @@ html {
 
 .distan-help__steps li {
 	margin: 0;
-	border-bottom: 1px solid #ECEAE4;
+	border-bottom: 1px solid var(--dsp-line);
 }
 
 .distan-help__steps li:last-child {
@@ -1038,17 +1021,96 @@ html {
 .distan-help__jump {
 	color: inherit;
 	text-decoration: none;
-	border-bottom: 1px dashed var(--dsp-line, #DED9CC);
+	border-bottom: 1px dashed var(--dsp-line, #c3c4c7);
 }
 
 .distan-help__jump:hover,
 .distan-help__jump:focus {
-	color: var(--dsp-stamp, #7A5A34);
+	color: var(--dsp-stamp, #2271b1);
 	border-bottom-color: currentColor;
 }
 
 .distan-help__doc-steps a {
-	color: var(--dsp-stamp, #7A5A34);
+	color: var(--dsp-stamp, #2271b1);
 	text-decoration: none;
 	border-bottom: 1px dashed currentColor;
+}
+
+/* Count chip — the small tally beside a summary ("リンク切れ 1"), a calmer,
+   more legible form than raw parentheses. */
+.hgp-count {
+	display: inline-block;
+	min-width: 1.5em;
+	margin-left: 6px;
+	padding: 0 7px;
+	border-radius: 9px;
+	background: var(--dsp-ground);
+	color: var(--dsp-slate);
+	font-size: 12px;
+	line-height: 1.7;
+	text-align: center;
+	vertical-align: middle;
+}
+
+/* Help modal — copyable marker snippets. Each shows the exact comment to paste
+   into a template, with a one-click copy. */
+.distan-help__snippet {
+	margin: 0 0 var(--sp-md);
+}
+
+.distan-help__code {
+	margin: 0;
+	padding: 10px 12px;
+	background: var(--dsp-ink);
+	color: var(--dsp-ground);
+	border-radius: 2px;
+	font-family: var(--dsp-mono);
+	font-size: 12px;
+	overflow-x: auto;
+	white-space: pre;
+}
+
+.distan-help__copy {
+	margin: 6px 0 4px;
+}
+
+.distan-help__snippet .distan-help__doc {
+	margin: 4px 0 0;
+	color: var(--dsp-slate);
+	font-size: 12px;
+}
+
+/* Compact copyable snippet — inline marker + copy button, sized to sit inside
+   a settings-row description (lighter than the help modal's dark blocks). */
+.distan-snippet {
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin: 6px 0 0;
+}
+
+.distan-snippet__code {
+	padding: 3px 8px;
+	background: var(--dsp-ground);
+	border: 1px solid var(--dsp-line);
+	border-radius: 2px;
+	font-family: var(--dsp-mono);
+	font-size: 12px;
+	color: var(--dsp-ink);
+	white-space: nowrap;
+	overflow-x: auto;
+	max-width: 100%;
+}
+
+.distan-snippet__copy.button {
+	min-height: 0;
+	padding: 2px 10px;
+	font-size: 12px;
+}
+
+/* Details notes should fill the box, not wrap early and leave a gap on the
+   right — the 68ch measure is for prose columns elsewhere, not these panels. */
+.hgp-details .hgp-hint {
+	max-width: none;
 }

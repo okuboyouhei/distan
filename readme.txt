@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.6.0
+Stable tag: 1.6.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -33,9 +33,11 @@ This suits people who deliver *files*, not a CMS — for example a recruitment s
 * Keeps cache-busting query strings on assets, so file names stay stable and can be overwritten over FTP.
 * Optional `sitemap.xml` and a minimal `robots.txt`, built from the pages actually generated, using the production URL.
 * Optional Markdown export (`content.md`) that combines every page's main content into one file — handy for feeding a site into AI tools (Gemini Notebook / NotebookLM, and similar).
+* Exports a single page as a starting template for an outside coder: that page plus only the assets it references (following stylesheet `url()` and `@import`), laid out at their real paths, with a README of ground rules. In-page markers can drop the block-library CSS (`distan:no-block-styles`) or drop scripts and styles under a path prefix (`distan:drop-assets`).
+* Surfaces URLs that WordPress core's sitemap lists but enumeration missed — a plugin's thank-you page, a virtual route — and lets you include or ignore each. The choice is remembered across runs, so there is no filter to hand-write.
+* Reports a diff after each run — which files were added, changed, or need removing from production — and can hand you a ZIP of just the changed files, with a list of what to delete.
+* Audits internal links and reports any whose target was not generated, and compares against WordPress core's sitemap to surface pages that enumeration may have missed.
 * Optionally bundle extra files or directories that nothing links to (`distan_extra_assets`) — for assets referenced only from inside a script, such as a JSON file fetched by JavaScript.
-* Reports a diff after each run: which files were added, and which need to be removed from production.
-* Audits links and reports any whose target was not generated.
 * Downloads the result as a ZIP.
 
 **Requirements**
@@ -44,7 +46,7 @@ The only hard requirement is loopback HTTP (the site being able to request itsel
 
 **Not for every case**
 
-Distan is not suitable when the client updates the site themselves, when forms, search, comments, or membership are required, or for sites of only a few pages. If you need built-in deployment to many destinations, scheduled or change-based publishing, or managed static hosting, a larger tool such as Simply Static or Staatic will fit better.
+Distan is not suitable when the client updates the site themselves, or when forms, search, comments, or membership are required. If you need built-in deployment to many destinations, scheduled or change-based publishing, or managed static hosting, a larger tool such as Simply Static or Staatic will fit better.
 
 == Installation ==
 
@@ -93,6 +95,13 @@ Yes. Classic and block themes are both supported, including the block navigation
 Yes, with an explicit opt-in. Name the query keys that change the page with the distan_variant_keys filter, then register the specific URLs you want to ship with the distan_sources filter — usually built in a loop from the same terms or posts the page's pulldown or checkboxes are built from. Each value becomes its own static file. Because a plain static host addresses files by path only, the query is folded into the path: the published URL becomes /products/filter-chair/ rather than /products/?filter=chair. Distan does not discover these automatically — pulldown and multi-checkbox URLs are not links in the page, and their combinations are unbounded — so you decide which ones to generate. See README.md for copy-paste examples.
 
 == Changelog ==
+
+= 1.6.1 =
+* Improved: the admin screen now follows the WordPress admin colour scheme instead of a custom palette. The accent tracks the colour scheme each user picks, and status badges are shown in neutral greys with red reserved for real problems such as broken links.
+* Improved: the section sub-navigation no longer sticks to the top of the screen, so it never covers a heading while scrolling. Dates are all shown in the site's timezone. The uncovered-URL list scrolls once it grows long, and the settings save bar keeps a little breathing room.
+* Clarified: the descriptions for "WordPress の痕跡を除く" and the template export now spell out that the former only removes invisible metadata (block CSS and plugin JS are left to the per-page markers), so the two are not confused.
+* Fixed: block styles the template export could leave behind. The distan:no-block-styles marker now also removes the inline block styles WordPress emits (wp-block-*-inline-css, the style/global-styles placeholders, and the wp-img-auto-sizes helper), not just the stylesheet link and global-styles block.
+* Updated: bundled Alpine.js to 3.17.1.
 
 = 1.6.0 =
 * Added: template markers for the template export. A page can declare, in an HTML comment, what to drop from its one-page template — `<!-- distan:no-block-styles -->` removes the block library CSS and global styles, and `<!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ -->` removes scripts and stylesheets whose output path starts with the given prefixes (directory or single file). The referenced tags are removed with the files so nothing dangles, and the marker comments are stripped from the delivered template. Distan does not guess what is unused; it acts on what the template declares.

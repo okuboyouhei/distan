@@ -662,21 +662,23 @@ class Distan_Admin {
 						</p>
 
 						<?php if ( ! empty( $takeup_active ) ) : ?>
-							<table class="hgp-table hgp-takeup__table">
-								<?php foreach ( $takeup_active as $i => $url ) : ?>
-									<?php $included = isset( $takeup_include[ $url ] ); ?>
-									<tr>
-										<td class="hgp-takeup__url"><code><?php echo esc_html( $url ); ?></code>
-											<input type="hidden" name="url[<?php echo esc_attr( (string) $i ); ?>]" value="<?php echo esc_attr( $url ); ?>">
-										</td>
-										<td class="hgp-takeup__choices">
-											<label><input type="radio" name="takeup[<?php echo esc_attr( (string) $i ); ?>]" value="pending" <?php checked( ! $included ); ?>> <?php esc_html_e( '未決', 'distan' ); ?></label>
-											<label><input type="radio" name="takeup[<?php echo esc_attr( (string) $i ); ?>]" value="include" <?php checked( $included ); ?>> <?php esc_html_e( '含める', 'distan' ); ?></label>
-											<label><input type="radio" name="takeup[<?php echo esc_attr( (string) $i ); ?>]" value="ignore"> <?php esc_html_e( '今後表示しない', 'distan' ); ?></label>
-										</td>
-									</tr>
-								<?php endforeach; ?>
-							</table>
+							<div class="hgp-takeup__list">
+								<table class="hgp-table hgp-takeup__table">
+									<?php foreach ( $takeup_active as $i => $url ) : ?>
+										<?php $included = isset( $takeup_include[ $url ] ); ?>
+										<tr>
+											<td class="hgp-takeup__url"><code><?php echo esc_html( $url ); ?></code>
+												<input type="hidden" name="url[<?php echo esc_attr( (string) $i ); ?>]" value="<?php echo esc_attr( $url ); ?>">
+											</td>
+											<td class="hgp-takeup__choices">
+												<label><input type="radio" name="takeup[<?php echo esc_attr( (string) $i ); ?>]" value="pending" <?php checked( ! $included ); ?>> <?php esc_html_e( '未決', 'distan' ); ?></label>
+												<label><input type="radio" name="takeup[<?php echo esc_attr( (string) $i ); ?>]" value="include" <?php checked( $included ); ?>> <?php esc_html_e( '含める', 'distan' ); ?></label>
+												<label><input type="radio" name="takeup[<?php echo esc_attr( (string) $i ); ?>]" value="ignore"> <?php esc_html_e( '今後表示しない', 'distan' ); ?></label>
+											</td>
+										</tr>
+									<?php endforeach; ?>
+								</table>
+							</div>
 						<?php endif; ?>
 
 						<p class="hgp-takeup__extra">
@@ -698,7 +700,7 @@ class Distan_Admin {
 
 						<?php if ( ! empty( $takeup_ignored_list ) ) : ?>
 							<details class="hgp-details hgp-takeup__ignored">
-								<summary><?php esc_html_e( '今後表示しないにした URL', 'distan' ); ?> (<?php echo count( $takeup_ignored_list ); ?>)</summary>
+								<summary><?php esc_html_e( '今後表示しないにした URL', 'distan' ); ?> <span class="hgp-count"><?php echo count( $takeup_ignored_list ); ?></span></summary>
 								<?php foreach ( $takeup_ignored_list as $ig_url ) : ?>
 									<label class="hgp-takeup__restore">
 										<input type="checkbox" name="restore[]" value="<?php echo esc_attr( $ig_url ); ?>">
@@ -755,7 +757,7 @@ class Distan_Admin {
 							<span class="hgp-stat__num" x-text="(manifest.cleaned || []).length"></span>
 							<span class="hgp-stat__label"><?php esc_html_e( '出力先から削除', 'distan' ); ?></span>
 						</div>
-						<div class="hgp-stat" :class="(manifest.broken || []).length ? 'is-warn' : ''">
+						<div class="hgp-stat" :class="(manifest.broken || []).length ? 'is-error' : ''">
 							<span class="hgp-stat__num" x-text="(manifest.broken || []).length"></span>
 							<span class="hgp-stat__label"><?php esc_html_e( 'リンク切れ', 'distan' ); ?></span>
 						</div>
@@ -766,7 +768,7 @@ class Distan_Admin {
 					<details class="hgp-details is-error" open>
 						<summary>
 							<?php esc_html_e( '書き出せなかったページ', 'distan' ); ?>
-							(<span x-text="genErrors.length"></span>)
+							<span class="hgp-count" x-text="genErrors.length"></span>
 						</summary>
 						<table class="hgp-table hgp-table--pairs">
 							<template x-for="e in genErrors" :key="e.url">
@@ -809,10 +811,10 @@ class Distan_Admin {
 				</template>
 
 				<template x-if="manifest && manifest.broken && manifest.broken.length">
-					<details class="hgp-details is-warn">
+					<details class="hgp-details is-error">
 						<summary>
 							<?php esc_html_e( 'リンク切れ', 'distan' ); ?>
-							(<span x-text="manifest.broken.length"></span>)
+							<span class="hgp-count" x-text="manifest.broken.length"></span>
 						</summary>
 						<p class="hgp-hint">
 							<?php esc_html_e( 'リンク先のファイルが書き出されていません。テーマがカテゴリーや著者アーカイブへリンクしている場合に起きます。自動では修正しません。', 'distan' ); ?>
@@ -829,7 +831,7 @@ class Distan_Admin {
 					<details class="hgp-details is-warn">
 						<summary>
 							<?php esc_html_e( '本番から削除が必要なファイル', 'distan' ); ?>
-							(<span x-text="manifest.removed.length"></span>)
+							<span class="hgp-count" x-text="manifest.removed.length"></span>
 						</summary>
 						<p class="hgp-hint">
 							<?php esc_html_e( '前回の納品物に含まれていたファイルです。出力先からは削除済みです。すでにアップロード済みの場合は、本番サーバーから手で削除してください。', 'distan' ); ?>
@@ -850,9 +852,6 @@ class Distan_Admin {
 
 					<div class="hgp-card__head">
 						<h2><?php esc_html_e( '設定', 'distan' ); ?></h2>
-						<div class="hgp-card__actions">
-							<?php submit_button( __( '設定を保存', 'distan' ), 'primary', 'submit-top', false ); ?>
-						</div>
 					</div>
 
 					<h3 class="hgp-settings-group hgp-settings-group--first"><?php esc_html_e( '基本設定', 'distan' ); ?></h3>
@@ -938,8 +937,22 @@ class Distan_Admin {
 									<?php esc_html_e( '納品用にHTMLを整える', 'distan' ); ?>
 								</label>
 								<p class="description">
-									<?php esc_html_e( 'generator、RSD/WLW、REST API、oEmbed、絵文字、ショートリンク、投機的読み込みを書き出しません。開発環境の noindex も常に除去します。', 'distan' ); ?>
+									<?php esc_html_e( 'generator、RSD/WLW、REST API、oEmbed、絵文字、ショートリンク、投機的読み込みを書き出しません。開発環境の noindex も常に除去します。消すのは見た目に影響しないメタ情報だけで、ブロック用 CSS（wp-block-library / global-styles）やプラグインの JS は対象外です。特定ページからそれらを外したいときは、テンプレート書き出しのマーカーを使ってください（テンプレートの <head> などに貼り付け）。', 'distan' ); ?>
 								</p>
+								<div class="distan-snippet" x-data="{ copied: false }">
+									<code class="distan-snippet__code">&lt;!-- distan:no-block-styles --&gt;</code>
+									<button type="button" class="button distan-snippet__copy" @click="navigator.clipboard && navigator.clipboard.writeText('<!-- distan:no-block-styles -->'); copied = true; setTimeout(() =&gt; copied = false, 1500)">
+										<span x-show="!copied"><?php esc_html_e( 'コピー', 'distan' ); ?></span>
+										<span x-show="copied" x-cloak><?php esc_html_e( 'コピー済み', 'distan' ); ?></span>
+									</button>
+								</div>
+								<div class="distan-snippet" x-data="{ copied: false }">
+									<code class="distan-snippet__code">&lt;!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ --&gt;</code>
+									<button type="button" class="button distan-snippet__copy" @click="navigator.clipboard && navigator.clipboard.writeText('<!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ -->'); copied = true; setTimeout(() =&gt; copied = false, 1500)">
+										<span x-show="!copied"><?php esc_html_e( 'コピー', 'distan' ); ?></span>
+										<span x-show="copied" x-cloak><?php esc_html_e( 'コピー済み', 'distan' ); ?></span>
+									</button>
+								</div>
 							</td>
 						</tr>
 						</table>
@@ -1020,7 +1033,7 @@ class Distan_Admin {
 									<?php esc_html_e( '生成画面に「テンプレート書き出し」を表示する', 'distan' ); ?>
 								</label>
 								<p class="description">
-									<?php esc_html_e( '生成済みのページを1枚選ぶと、そのページと、それが参照している CSS・JS・フォント・画像だけをまとめた ZIP を出せます。共通ヘッダー・フッターに沿った特設ページの制作を外部に依頼するときの雛形として渡せます。参照アセットのみを同梱するので、ナビの遷移先ページや他ページ専用の素材は含まれません。ZIP のルートには制作者向けの README.md（触ってよい範囲・相対パスの注意など）を同梱します。', 'distan' ); ?>
+									<?php esc_html_e( '生成済みのページを1枚選ぶと、そのページと、それが参照している CSS・JS・フォント・画像だけをまとめた ZIP を出せます。共通ヘッダー・フッターに沿った特設ページの制作を外部に依頼するときの雛形として渡せます。参照アセットのみを同梱するので、ナビの遷移先ページや他ページ専用の素材は含まれません。ZIP のルートには制作者向けの README.md（触ってよい範囲・相対パスの注意など）を同梱します。テンプレートに distan:no-block-styles / distan:drop-assets のマーカーを書いておくと、この雛形だけからブロック用 CSS や指定したスクリプトを外せます（サイト全体の「WordPress の痕跡を除く」とは別で、選んだ1ページにのみ効きます）。', 'distan' ); ?>
 								</p>
 							</td>
 						</tr>
@@ -1131,7 +1144,7 @@ class Distan_Admin {
 						<dd><?php esc_html_e( '本番納品では noindex を除去します。テスト環境で見せるだけなら残します。', 'distan' ); ?></dd>
 
 						<dt><a class="distan-help__jump" href="#set-clean-html" @click="open = false"><?php esc_html_e( 'WordPress の痕跡を除く', 'distan' ); ?></a></dt>
-						<dd><?php esc_html_e( 'generator や絵文字などの余分な出力を省き、納品用に整えます。', 'distan' ); ?></dd>
+						<dd><?php esc_html_e( 'generator や絵文字などの余分な出力を全ページから省き、納品用に整えます（メタ情報のみ。ブロック用 CSS やプラグイン JS は対象外）。', 'distan' ); ?></dd>
 
 						<dt><a class="distan-help__jump" href="#set-markdown" @click="open = false"><?php esc_html_e( 'Markdown を書き出す', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( '全ページの本文を content.md にまとめます。AI ツールにサイト内容を読ませる用途です。', 'distan' ); ?></dd>
@@ -1143,11 +1156,34 @@ class Distan_Admin {
 						<dd><?php esc_html_e( '前回の生成から追加・変更されたファイルだけをまとめた ZIP を出せます。削除すべきファイルは同梱の DELETE.txt に一覧されます。', 'distan' ); ?></dd>
 
 						<dt><a class="distan-help__jump" href="#set-template-export" @click="open = false"><?php esc_html_e( 'テンプレート書き出し', 'distan' ); ?></a></dt>
-						<dd><?php esc_html_e( '生成済みページを1枚選ぶと、そのページと参照アセットだけをまとめて、外部コーダー向けの雛形として渡せます。ナビの遷移先や他ページ専用の素材は含みません。', 'distan' ); ?></dd>
+						<dd><?php esc_html_e( '選んだ1ページと参照アセットだけをまとめて、外部コーダー向けの雛形として渡せます（この1枚だけが対象）。テンプレートに distan:no-block-styles / distan:drop-assets を書けば、その雛形からブロック用 CSS や指定スクリプトを外せます。', 'distan' ); ?></dd>
 
 						<dt><a class="distan-help__jump" href="#set-dispatch-button" @click="open = false"><?php esc_html_e( 'デプロイ', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( '生成物を確認したあと、自分の公開処理（git push / rsync など）を手動でつなぐためのボタンです。', 'distan' ); ?></dd>
 					</dl>
+
+					<h3 class="distan-help__group"><?php esc_html_e( 'テンプレートのマーカー', 'distan' ); ?></h3>
+					<p class="distan-help__doc-p">
+						<?php esc_html_e( '特設ページのテンプレートに次のコメントを書いておくと、そのページをテンプレート書き出しで選んだとき、雛形から不要なものを外せます。以下をそのままコピーして、テンプレートの <head> などに貼り付けてください。', 'distan' ); ?>
+					</p>
+
+					<div class="distan-help__snippet" x-data="{ copied: false }">
+						<pre class="distan-help__code"><code>&lt;!-- distan:no-block-styles --&gt;</code></pre>
+						<button type="button" class="button distan-help__copy" @click="navigator.clipboard && navigator.clipboard.writeText('<!-- distan:no-block-styles -->'); copied = true; setTimeout(() =&gt; copied = false, 1500)">
+							<span x-show="!copied"><?php esc_html_e( 'コピー', 'distan' ); ?></span>
+							<span x-show="copied" x-cloak><?php esc_html_e( 'コピーしました', 'distan' ); ?></span>
+						</button>
+						<p class="distan-help__doc"><?php esc_html_e( 'ブロックエディタの標準スタイル（wp-block-library / global-styles とその関連インライン）を外します。自前で CSS を書く特設ページ向け。', 'distan' ); ?></p>
+					</div>
+
+					<div class="distan-help__snippet" x-data="{ copied: false }">
+						<pre class="distan-help__code"><code>&lt;!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ --&gt;</code></pre>
+						<button type="button" class="button distan-help__copy" @click="navigator.clipboard && navigator.clipboard.writeText('<!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ -->'); copied = true; setTimeout(() =&gt; copied = false, 1500)">
+							<span x-show="!copied"><?php esc_html_e( 'コピー', 'distan' ); ?></span>
+							<span x-show="copied" x-cloak><?php esc_html_e( 'コピーしました', 'distan' ); ?></span>
+						</button>
+						<p class="distan-help__doc"><?php esc_html_e( 'スペース区切りで書いたパス（前方一致）のスクリプト・スタイルを外します。ディレクトリ（wp-includes/ など）でもファイル単体でも指定できます。foo は実際のプラグイン名などに置き換えてください。', 'distan' ); ?></p>
+					</div>
 
 					<h3 class="distan-help__group"><?php esc_html_e( 'もっと詳しく', 'distan' ); ?></h3>
 					<p class="distan-help__doc">
