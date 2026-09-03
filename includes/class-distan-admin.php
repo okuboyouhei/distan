@@ -941,14 +941,14 @@ class Distan_Admin {
 								</p>
 								<div class="distan-snippet" x-data="{ copied: false }">
 									<code class="distan-snippet__code">&lt;!-- distan:no-block-styles --&gt;</code>
-									<button type="button" class="button distan-snippet__copy" @click="navigator.clipboard && navigator.clipboard.writeText('<!-- distan:no-block-styles -->'); copied = true; setTimeout(() =&gt; copied = false, 1500)">
+									<button type="button" class="button distan-snippet__copy" @click="distanCopy('<!-- distan:no-block-styles -->'); copied = true; setTimeout(() =&gt; copied = false, 1500)">
 										<span x-show="!copied"><?php esc_html_e( 'コピー', 'distan' ); ?></span>
 										<span x-show="copied" x-cloak><?php esc_html_e( 'コピー済み', 'distan' ); ?></span>
 									</button>
 								</div>
 								<div class="distan-snippet" x-data="{ copied: false }">
 									<code class="distan-snippet__code">&lt;!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ --&gt;</code>
-									<button type="button" class="button distan-snippet__copy" @click="navigator.clipboard && navigator.clipboard.writeText('<!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ -->'); copied = true; setTimeout(() =&gt; copied = false, 1500)">
+									<button type="button" class="button distan-snippet__copy" @click="distanCopy('<!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ -->'); copied = true; setTimeout(() =&gt; copied = false, 1500)">
 										<span x-show="!copied"><?php esc_html_e( 'コピー', 'distan' ); ?></span>
 										<span x-show="copied" x-cloak><?php esc_html_e( 'コピー済み', 'distan' ); ?></span>
 									</button>
@@ -1169,7 +1169,7 @@ class Distan_Admin {
 
 					<div class="distan-help__snippet" x-data="{ copied: false }">
 						<pre class="distan-help__code"><code>&lt;!-- distan:no-block-styles --&gt;</code></pre>
-						<button type="button" class="button distan-help__copy" @click="navigator.clipboard && navigator.clipboard.writeText('<!-- distan:no-block-styles -->'); copied = true; setTimeout(() =&gt; copied = false, 1500)">
+						<button type="button" class="button distan-help__copy" @click="distanCopy('<!-- distan:no-block-styles -->'); copied = true; setTimeout(() =&gt; copied = false, 1500)">
 							<span x-show="!copied"><?php esc_html_e( 'コピー', 'distan' ); ?></span>
 							<span x-show="copied" x-cloak><?php esc_html_e( 'コピーしました', 'distan' ); ?></span>
 						</button>
@@ -1178,7 +1178,7 @@ class Distan_Admin {
 
 					<div class="distan-help__snippet" x-data="{ copied: false }">
 						<pre class="distan-help__code"><code>&lt;!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ --&gt;</code></pre>
-						<button type="button" class="button distan-help__copy" @click="navigator.clipboard && navigator.clipboard.writeText('<!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ -->'); copied = true; setTimeout(() =&gt; copied = false, 1500)">
+						<button type="button" class="button distan-help__copy" @click="distanCopy('<!-- distan:drop-assets wp-includes/ wp-content/plugins/foo/ -->'); copied = true; setTimeout(() =&gt; copied = false, 1500)">
 							<span x-show="!copied"><?php esc_html_e( 'コピー', 'distan' ); ?></span>
 							<span x-show="copied" x-cloak><?php esc_html_e( 'コピーしました', 'distan' ); ?></span>
 						</button>

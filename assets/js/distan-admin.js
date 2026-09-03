@@ -28,6 +28,35 @@
 		} );
 	}
 
+	// Copy helper shared by the marker snippets in the help modal and the
+	// settings screen. navigator.clipboard needs a secure context (https or
+	// localhost); on a plain-http dev host like http://site.local it is absent,
+	// so fall back to a hidden textarea + execCommand, which works there too.
+	function distanCopyFallback( text ) {
+		var ta = document.createElement( 'textarea' );
+		ta.value = text;
+		ta.setAttribute( 'readonly', '' );
+		ta.style.position = 'fixed';
+		ta.style.top = '-1000px';
+		ta.style.opacity = '0';
+		document.body.appendChild( ta );
+		ta.select();
+		try {
+			document.execCommand( 'copy' );
+		} catch ( e ) {}
+		document.body.removeChild( ta );
+	}
+
+	window.distanCopy = function ( text ) {
+		if ( window.navigator && window.navigator.clipboard && window.navigator.clipboard.writeText ) {
+			window.navigator.clipboard.writeText( text ).catch( function () {
+				distanCopyFallback( text );
+			} );
+			return;
+		}
+		distanCopyFallback( text );
+	};
+
 	window.distanAdmin = function () {
 		return {
 			envResults: [],
