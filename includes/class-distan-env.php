@@ -64,7 +64,7 @@ class Distan_Env {
 	 * @return array<string, string>
 	 */
 	public static function check_dev_urls(): array {
-		$label = __( '開発URLの残り（前回の生成）', 'distan' );
+		$label = __( "開発URLの残り\n（前回の生成）", 'distan' );
 
 		$manifest = get_option( Distan_Generator::MANIFEST_KEY, array() );
 		$dev      = is_array( $manifest ) && isset( $manifest['dev_urls'] ) && is_array( $manifest['dev_urls'] )
