@@ -1114,3 +1114,15 @@ html {
 .hgp-details .hgp-hint {
 	max-width: none;
 }
+
+/* Live title filter for the template candidate select. */
+.hgp-template__filter {
+	min-width: 220px;
+	padding: 4px 8px;
+	border: 1px solid var(--dsp-line);
+	border-radius: 2px;
+}
+
+.hgp-template__count {
+	margin: var(--sp-xs) 0 0;
+}
