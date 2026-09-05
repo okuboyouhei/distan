@@ -326,9 +326,64 @@ add_filter( 'distan_url_replacements', function ( $pairs ) {
 } );
 ```
 
-利用できるフィルタ:
+利用できるフィルタの一覧です。引数は先頭が対象の値で、その値を返します（真偽値フィルタは既定値の bool を返す）。
 
-`distan_capability` `distan_collect` `distan_post_types` `distan_taxonomies` `distan_sources` `distan_variant_keys` `distan_query_variant_segment` `distan_archive_max_pages` `distan_term_max_pages` `distan_404_probe` `distan_head_actions` `distan_dequeue_handles` `distan_remove_global_styles` `distan_robots` `distan_robots_lines` `distan_clean_html` `distan_clean_output` `distan_flatten_theme` `distan_uploads_dir` `distan_extra_assets` `distan_blocked_extensions` `distan_large_file_threshold` `distan_url_replacements` `distan_markdown_region` `distan_manifest_source` `distan_use_core_sitemap` `distan_sitemap_entries` `distan_sitemap_exclude` `distan_sitemap_audit_max_pages` `distan_job_stale_after`
+**収集（どのページを生成するか）**
+
+| フィルタ | 引数 → 戻り値 | 既定 | 役割 |
+|---|---|---|---|
+| `distan_post_types` | `array $types` → `array` | 公開投稿タイプ | 静的化する投稿タイプを絞る／足す |
+| `distan_taxonomies` | `array $slugs` → `array` | `['category']` | アーカイブを生成するタクソノミー |
+| `distan_sources` | `array $providers` → `array` | `[]` | make_item 配列を返すコールバックを登録し、独自の URL 源を足す |
+| `distan_collect` | `array $queue` → `array` | 収集済みキュー | 最終キューを直接加工（特定ページの除外など） |
+| `distan_archive_max_pages` | `int $max` → `int` | 実ページ数 | 投稿アーカイブのページネーション上限 |
+| `distan_term_max_pages` | `int $max, WP_Term $term` → `int` | 実ページ数 | ターム別アーカイブのページ上限 |
+| `distan_404_probe` | `string $slug` → `string` | `distan-404-probe` | 404 テンプレートを引くために叩くスラッグ |
+| `distan_use_core_sitemap` | `bool $enabled` → `bool` | `false` | コア sitemap の URL も収集対象に含める |
+
+**URL とパスの書き換え**
+
+| フィルタ | 引数 → 戻り値 | 既定 | 役割 |
+|---|---|---|---|
+| `distan_url_replacements` | `array $pairs` → `array` | `[]` | 生成物全体への追加の URL 置換（dev→本番・CDN 等） |
+| `distan_uploads_dir` | `string $dir` → `string` | `media` | uploads の出力先ディレクトリ名（空文字で平坦化しない） |
+| `distan_flatten_theme` | `bool $enabled` → `bool` | `true` | テーマアセットを `assets/` に平坦化するか |
+| `distan_variant_keys` | `array $keys` → `array` | `[]` | 別ページとして扱うクエリキー（`tab`・`lang` 等） |
+| `distan_query_variant_segment` | `string $segment, array $pairs, string $url` → `string` | `key-value` を `_` で連結 | バリアントの出力パス断片の作り方 |
+| `distan_extra_assets` | `array $paths` → `array` | `[]` | 参照されないファイル／ディレクトリを必ず同梱（下記に詳細） |
+| `distan_blocked_extensions` | `array $exts` → `array` | 実行可能拡張子 | 出力に決してコピーしない拡張子 |
+| `distan_large_file_threshold` | `int $bytes` → `int` | `10MB` | 大きいファイルとして警告する閾値 |
+
+**HTML の整形・除去**
+
+| フィルタ | 引数 → 戻り値 | 既定 | 役割 |
+|---|---|---|---|
+| `distan_clean_output` | `bool $enabled` → `bool` | `true` | 整形・痕跡除去そのものの ON/OFF |
+| `distan_clean_html` | `string $html` → `string` | 整形後 HTML | 書き出し直前の HTML を最終加工 |
+| `distan_head_actions` | `array $actions` → `array` | 既知の head 出力 | `wp_head` から外すアクション（フック→コールバック→優先度） |
+| `distan_dequeue_handles` | `array $handles` → `array` | `wp-embed` 等 | 生成時に dequeue するスクリプト／スタイルのハンドル |
+| `distan_remove_global_styles` | `bool $remove` → `bool` | `false` | `global-styles` のインライン CSS を除去 |
+| `distan_robots` | `array $robots` → `array` | 整形後の robots | 各ページの robots ディレクティブ |
+
+**サイトマップ・robots.txt**
+
+| フィルタ | 引数 → 戻り値 | 既定 | 役割 |
+|---|---|---|---|
+| `distan_sitemap_entries` | `array $entries, array $queue` → `array` | 生成ページ | sitemap.xml のエントリ（`loc`／`lastmod`） |
+| `distan_sitemap_exclude` | `array $patterns` → `array` | 設定の除外 | sitemap から除くスラッグの前方一致／部分一致 |
+| `distan_sitemap_audit_max_pages` | `int $max` → `int` | `50` | コア sitemap 照合で辿るページ上限 |
+| `distan_robots_lines` | `array $lines` → `array` | 生成した行 | robots.txt の行 |
+
+**その他**
+
+| フィルタ | 引数 → 戻り値 | 既定 | 役割 |
+|---|---|---|---|
+| `distan_capability` | `string $cap` → `string` | `manage_options` | 管理画面・生成を許可する権限 |
+| `distan_manifest_source` | `string $source` → `string` | `db` | 差分の基準（`db`＝前回の記録／`output`＝現物の dist） |
+| `distan_markdown_region` | `string $html` → `string` | 本文領域 | Markdown 書き出し前の本文 HTML をテーマ別に調整 |
+| `distan_job_stale_after` | `int $seconds` → `int` | `120` | 生成ジョブが失効とみなされるまでの秒数（低速サイト向け） |
+
+（生成完了・デプロイの `distan_after_generate` / `distan_dispatch` は「アクション」です。[自動デプロイ](#自動デプロイ生成完了フック)を参照。）
 
 ### 参照されないファイルを含める（`distan_extra_assets`）
 
