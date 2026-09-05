@@ -330,6 +330,35 @@ add_filter( 'distan_url_replacements', function ( $pairs ) {
 
 `distan_capability` `distan_collect` `distan_post_types` `distan_taxonomies` `distan_sources` `distan_variant_keys` `distan_query_variant_segment` `distan_archive_max_pages` `distan_term_max_pages` `distan_404_probe` `distan_head_actions` `distan_dequeue_handles` `distan_remove_global_styles` `distan_robots` `distan_robots_lines` `distan_clean_html` `distan_clean_output` `distan_flatten_theme` `distan_uploads_dir` `distan_extra_assets` `distan_blocked_extensions` `distan_large_file_threshold` `distan_url_replacements` `distan_markdown_region` `distan_manifest_source` `distan_use_core_sitemap` `distan_sitemap_entries` `distan_sitemap_exclude` `distan_sitemap_audit_max_pages` `distan_job_stale_after`
 
+### 参照されないファイルを含める（`distan_extra_assets`）
+
+Distan は生成した HTML と CSS を読んでアセットを集めます。つまり **リンクや `url()` から辿れるものだけ** が生成物に入ります。裏を返すと、どこからも参照されていないファイルは取りこぼします。典型例は2つです。
+
+- スクリプトの中で組み立てて読むファイル。`fetch('../assets/json/data.json')` のようなパスは静的解析では見えません。
+- 表示には使わないソース類。`assets/scss/` のような、コンパイル前の元ファイル（本番で参照されるのは出力後の `.css` だけ）。
+
+こうしたファイルやディレクトリを **必ず生成物に含めたい** ときは、`distan_extra_assets` フィルタに列挙します。
+
+```php
+add_filter( 'distan_extra_assets', function ( $paths ) {
+    $paths[] = 'assets/json';               // ディレクトリ配下を丸ごと（再帰）
+    $paths[] = 'assets/scss';               // 表示に使わないソースも一式
+    $paths[] = 'assets/data/config.json';   // 単体ファイルでも可
+    return $paths;
+} );
+```
+
+挙動は次のとおりです。
+
+- **ディレクトリを指定すると配下を再帰的に** 含めます。ファイル単体でも指定できます。
+- 相対パスはテーマ（子テーマ→親テーマ）ディレクトリ基準で解決します。絶対パスも使えます。ただし **WordPress ルートの外は拒否** します（パストラバーサル・シンボリックリンクによる脱出を防ぐため）。
+- パスは他のテーマアセットと同じく平坦化されます（テーマ配下 → `assets/`）。そのため、スクリプトからの相対 `fetch` はそのまま動きます。
+- 含めたファイルはレポートに記録され、クリーンアップでも削除されません。実行可能な拡張子は拒否されます。
+- **これらのファイル内の URL は書き換えません。** JSON などのデータファイルをそのまま渡す用途に向いています。
+- 既定では何も足しません。ここに列挙したものだけが追加される opt-in です。
+
+ひとつ運用上の注意です。`dist/` は納品物です。`assets/scss/` のようなソースをここに含めると、**それも本番に上がり、差分 ZIP にも入ります**。納品物をソース抜きのクリーンな状態に保ちたい場合は、ソースは Git やビルドツール側で管理し、`dist/` には混ぜない、という分け方もできます。何を含めるかは案件に応じて判断してください。
+
 ### 構造化データ（JSON-LD）について
 
 Distan は構造化データを**生成しません**。テーマや SEO プラグイン（Yoast SEO、AIOSEO など）が出力した JSON-LD を、静的化時にそのまま保持し、内部の URL を本番 URL に置換します。構造化データを入れたい場合は、これらのプラグインで設定してください。Distan はそれを壊さず、本番向けの URL に直して書き出します。

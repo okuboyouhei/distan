@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.6.2
+Stable tag: 1.6.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -99,6 +99,10 @@ Yes, with an explicit opt-in. Name the query keys that change the page with the 
 1. Distan の管理画面。環境チェック、ボタンひとつの静的 HTML 書き出し（差分・リンク切れの表示、テンプレート書き出し、取りこぼしの取り込み）、そして納品に合わせた各種設定を 1 画面で行えます。
 
 == Changelog ==
+
+= 1.6.3 =
+* Added: a "設定" link on the plugin's row on the Plugins screen, so you can reach the Distan screen from there.
+* Improved: the template export page selector can now be filtered live by title. Type in the box above the list and the candidates narrow as you go — useful when a site has many pages.
 
 = 1.6.2 =
 * Fixed: the copy buttons for the template markers did nothing on a plain-http development host (for example http://site.local). The clipboard API is only available in a secure context, so a fallback is now used there.

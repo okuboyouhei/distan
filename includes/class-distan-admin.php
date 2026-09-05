@@ -32,6 +32,21 @@ class Distan_Admin {
 		add_action( 'admin_post_distan_download_template', array( $this, 'download_template' ) );
 		add_action( 'admin_post_distan_download_report', array( $this, 'download_report' ) );
 		add_action( 'admin_post_distan_save_takeup', array( $this, 'save_takeup' ) );
+
+		// A "設定" link on the Plugins list row, like most plugins offer.
+		add_filter( 'plugin_action_links_' . plugin_basename( DISTAN_FILE ), array( $this, 'plugin_action_links' ) );
+	}
+
+	/**
+	 * Prepend a settings link to the plugin's row on the Plugins screen.
+	 *
+	 * @param array<int, string> $links Existing action links.
+	 * @return array<int, string>
+	 */
+	public function plugin_action_links( $links ): array {
+		$settings = '<a href="' . esc_url( admin_url( 'admin.php?page=' . self::MENU_SLUG ) ) . '">' . esc_html__( '設定', 'distan' ) . '</a>';
+		array_unshift( $links, $settings );
+		return $links;
 	}
 
 	/**
@@ -577,7 +592,23 @@ class Distan_Admin {
 					sort( $tpl_pages );
 					?>
 					<?php if ( ! empty( $tpl_pages ) ) : ?>
-						<form class="hgp-template" id="distan-template" method="get" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+						<?php
+						// Build the candidate list once, labelled from the manifest,
+						// and hand it to Alpine so the select can be filtered live by
+						// title. No page reload, no round-trip.
+						$tpl_list = array();
+						foreach ( $tpl_pages as $tpl_page ) {
+							$tpl_label = $tpl_page;
+							if ( isset( $tpl_entries[ $tpl_page ]['label'] ) && '' !== (string) $tpl_entries[ $tpl_page ]['label'] ) {
+								$tpl_label = (string) $tpl_entries[ $tpl_page ]['label'] . ' — ' . $tpl_page;
+							}
+							$tpl_list[] = array(
+								'value' => $tpl_page,
+								'label' => $tpl_label,
+							);
+						}
+						?>
+						<form class="hgp-template" id="distan-template" method="get" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" x-data='{ q: "", pages: <?php echo esc_attr( (string) wp_json_encode( $tpl_list ) ); ?> }'>
 							<input type="hidden" name="action" value="distan_download_template">
 							<?php wp_nonce_field( 'distan_download' ); ?>
 							<h3 class="hgp-template__title"><?php esc_html_e( 'テンプレート書き出し', 'distan' ); ?></h3>
@@ -585,19 +616,18 @@ class Distan_Admin {
 								<?php esc_html_e( '選んだ1ページと、それが参照するアセット（CSS・JS・フォント・画像）だけをまとめた ZIP を作ります。共通ヘッダー・フッターに沿った特設ページの制作を外部に依頼するときの雛形として渡せます。ナビ等のリンク先ページや、他ページ専用の素材は含まれません。', 'distan' ); ?>
 							</p>
 							<p class="hgp-template__row">
+								<label class="screen-reader-text" for="distan-template-filter"><?php esc_html_e( 'タイトルで絞り込み', 'distan' ); ?></label>
+								<input type="search" id="distan-template-filter" class="hgp-template__filter" x-model="q" placeholder="<?php esc_attr_e( 'タイトルで絞り込み', 'distan' ); ?>" autocomplete="off">
 								<label class="screen-reader-text" for="distan-template-page"><?php esc_html_e( 'テンプレートにするページ', 'distan' ); ?></label>
 								<select id="distan-template-page" name="page_path">
-									<?php foreach ( $tpl_pages as $tpl_page ) : ?>
-										<?php
-										$tpl_label = $tpl_page;
-										if ( isset( $tpl_entries[ $tpl_page ]['label'] ) && '' !== (string) $tpl_entries[ $tpl_page ]['label'] ) {
-											$tpl_label = (string) $tpl_entries[ $tpl_page ]['label'] . ' — ' . $tpl_page;
-										}
-										?>
-										<option value="<?php echo esc_attr( $tpl_page ); ?>"><?php echo esc_html( $tpl_label ); ?></option>
-									<?php endforeach; ?>
+									<template x-for="p in pages.filter(p =&gt; q.trim() === '' || p.label.toLowerCase().includes(q.trim().toLowerCase()))" :key="p.value">
+										<option :value="p.value" x-text="p.label"></option>
+									</template>
 								</select>
 								<button type="submit" class="button"><?php esc_html_e( 'このページで書き出す', 'distan' ); ?></button>
+							</p>
+							<p class="hgp-template__count hgp-hint" x-show="q.trim() !== ''" x-cloak>
+								<span x-text="pages.filter(p =&gt; p.label.toLowerCase().includes(q.trim().toLowerCase())).length"></span><?php esc_html_e( ' 件が一致', 'distan' ); ?>
 							</p>
 						</form>
 					<?php endif; ?>
