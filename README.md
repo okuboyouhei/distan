@@ -6,7 +6,11 @@ Distan（ディスタン）は、WordPress を制作環境として使い、そ�
 
 > **English:** Distan turns WordPress into a build environment for static HTML deliverables. You author in WordPress, then export clean, self-contained HTML that runs anywhere — no WordPress, no PHP, no database on the production server. Built for agencies that hand over HTML files rather than a CMS.
 
-![WordPress は作る場所、静的 HTML が納品物。従来は WordPress ごと本番に残るが、Distan では工房（WordPress）を手元に残し、本番には静的 HTML だけを納品する。](assets/distan-concept.svg)
+## ヘッドロス CMS
+
+Distan の考え方を一言でいえば「ヘッドロス CMS」です。本番へ送るのは、静的 HTML という“頭”だけ。胴体（WordPress）は手元の工房に残します。動く WordPress を本番に置き続けないので、更新・脆弱性対応・環境依存といった保守の重さが、納品物から切り離されます。
+
+![従来は WordPress ごと本番に残り、更新・脆弱性対応・環境依存が付いてくる。Distan では工房（WordPress）を手元に残し、本番には静的 HTML だけを納品する。](assets/distan-concept.svg)
 
 ---
 
