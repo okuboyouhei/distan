@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.6.3
+Stable tag: 1.6.4
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -97,8 +97,12 @@ Yes, with an explicit opt-in. Name the query keys that change the page with the 
 == Screenshots ==
 
 1. Distan の管理画面。環境チェック、ボタンひとつの静的 HTML 書き出し（差分・リンク切れの表示、テンプレート書き出し、取りこぼしの取り込み）、そして納品に合わせた各種設定を 1 画面で行えます。
+2. 「使い方」ヘルプ。Distan の考え方（WordPress は作る場所、書き出した HTML が納品物）と、環境の確認 → 書き出し → 受け取り・公開の流れ、主な設定の要点を確認できます。
 
 == Changelog ==
+
+= 1.6.4 =
+* Updated: the plugin screenshots — the full admin screen and the in-app help.
 
 = 1.6.3 =
 * Added: a "設定" link on the plugin's row on the Plugins screen, so you can reach the Distan screen from there.
