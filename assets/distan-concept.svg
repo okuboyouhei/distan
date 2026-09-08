@@ -2,11 +2,11 @@
   <rect x="0" y="0" width="1200" height="420" fill="#FFFFFF"/>
   <rect x="14" y="14" width="1172" height="392" rx="16" fill="none" stroke="#E0E0E0" stroke-width="1.5"/>
 
-  <!-- ================= LEFT : 従来 / HEADFULL ================= -->
+  <!-- ================= LEFT : 従来 / HEAD FULL ================= -->
   <g>
     <rect x="72" y="44" width="472" height="332" rx="14" fill="#FFFFFF" stroke="#DADADA" stroke-width="1.5"/>
     <!-- row1: title band -->
-    <text x="96" y="82" font-size="13" letter-spacing="2" fill="#8A8A8A" font-weight="700">従来 — HEADFULL</text>
+    <text x="96" y="82" font-size="13" letter-spacing="2" fill="#8A8A8A" font-weight="700">従来 — HEAD FULL</text>
     <text x="96" y="112" font-size="21" font-weight="700" fill="#111111">WordPress ごと本番に置く</text>
     <line x1="96" y1="128" x2="520" y2="128" stroke="#EDEDED" stroke-width="1"/>
     <!-- row2: diagram zone (server stack), fixed band y=148..286 -->
@@ -37,11 +37,11 @@
     <path d="M591 210 h15 M600 202 l9 8 -9 8" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
   </g>
 
-  <!-- ================= RIGHT : ヘッドロス / HEAD ONLY ================= -->
+  <!-- ================= RIGHT : ヘッドロス / HEAD LOSS ================= -->
   <g>
     <rect x="656" y="44" width="472" height="332" rx="14" fill="#FFFFFF" stroke="#111111" stroke-width="2"/>
     <!-- row1: title band -->
-    <text x="680" y="82" font-size="13" letter-spacing="2" fill="#111111" font-weight="700">ヘッドロス — HEAD ONLY</text>
+    <text x="680" y="82" font-size="13" letter-spacing="2" fill="#111111" font-weight="700">ヘッドロス — HEAD LOSS</text>
     <text x="680" y="112" font-size="21" font-weight="700" fill="#111111">静的HTMLだけ本番に置く</text>
     <line x1="680" y1="128" x2="1104" y2="128" stroke="#EDEDED" stroke-width="1"/>
     <!-- row2: diagram zone (workshop -> distan -> server), same band y=148..286 -->
@@ -58,11 +58,11 @@
 
     <rect x="920" y="148" width="184" height="138" rx="10" fill="#F7F7F7" stroke="#111111" stroke-width="1.5"/>
     <text x="1012" y="172" font-size="12" fill="#8A8A8A" text-anchor="middle" letter-spacing="1">クライアントのサーバー</text>
-    <rect x="944" y="186" width="136" height="26" rx="6" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
+    <rect x="940" y="186" width="144" height="26" rx="6" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
     <text x="1012" y="204" font-size="12" fill="#333333" text-anchor="middle">index.html</text>
-    <rect x="944" y="218" width="136" height="26" rx="6" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
+    <rect x="940" y="218" width="144" height="26" rx="6" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
     <text x="1012" y="236" font-size="12" fill="#333333" text-anchor="middle">about/ …</text>
-    <rect x="944" y="250" width="136" height="26" rx="6" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
+    <rect x="940" y="250" width="144" height="26" rx="6" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
     <text x="1012" y="268" font-size="12" fill="#333333" text-anchor="middle">news/ …</text>
     <!-- row3: tag row, same band y=300..332 -->
     <g font-size="13" font-weight="700">

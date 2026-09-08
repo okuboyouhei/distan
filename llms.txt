@@ -23,6 +23,7 @@ Distan は公開中の全ページをループバック HTTP で巡回し、静�
 - 差分レポート・自動掃除・差分 Markdown・ZIP 書き出し（全体）／差分 ZIP 書き出し（前回から変わった分のみ・本番と同じ相対パス・DELETE.txt と distan-diff.md 同梱）
 - 大きいファイルの検出と警告（バイナリはストリームコピー、一定サイズ超はレポートに一覧。既定 10MB、distan_large_file_threshold で変更可。コピーはするので手作業不要）
 - Markdown 書き出し（選択制、content.md、Gemini Notebook（旧NotebookLM）等の AI ツール向け）
+  - Markdown書き出し: 表→パイプ表・pre/code→フェンス/バッククォート・img→![alt]・blockquote→>・strong/em→**/*・ol→番号・hr→---。各セクションにtitle/URL/description。titleは<title>→本文h1→URLの順でフォールバック、本文先頭の重複見出しは除去。TOCは逐次書き出し設計と衝突のため未実装
 - サイトマップ書き出し（選択制、sitemap.xml、Google Search Console 対応。著者・日付アーカイブは載せないので ID 露出なし。スラッグ以下や語を含む URL を除外可）
 - robots.txt 書き出し（選択制、最小構成。サイトマップ有効時は Sitemap: 行を記載）
 - リンク監査
@@ -35,7 +36,7 @@ Distan は公開中の全ページをループバック HTTP で巡回し、静�
 - テンプレート書き出し。生成済みページを 1 枚選ぶと、そのページ＋参照アセットのみ（CSS・JS・フォント・画像、url()・@import も再帰追従）を本番と同じ相対パスで ZIP 化（Distan_Report::build_template_zip）。共通ヘッダー・フッターに沿った特設ページ制作を外部委託する際の雛形。全ページ分の素材は同梱せず、ナビ遷移先ページは 1 枚納品では欠落する前提。ZIP ルートに制作者向け README.md 同梱（head/header/footer 不可侵・本文のみ差し替え・相対パス維持）。本文領域の切り出しはしない。生成画面の「テンプレート書き出し」設定（既定オン）で表示切替
 - プラグイン一覧に「設定」リンク（plugin_action_links → admin.php?page=distan）
 - テンプレート候補のライブ絞り込み。全候補を Alpine x-data に JSON で渡し x-for で option をタイトル部分一致フィルタ。生成経路に非依存・フロント完結
-  - テンプレートマーカー（テンプレート書き出し限定）: `<!-- distan:no-block-styles -->`＝ブロックCSS除去(wp-block-library/-theme link＋id が wp-block-*/global-styles* のインラインstyle全部＝library-inline/per-block/placeholder。wp-img-auto-sizesも対象)、`<!-- distan:drop-assets <prefix>... -->`＝出力相対パス前方一致でscript/style除去（plugin/coreは wp-content/plugins/・wp-includes/ のまま）。トップレベルlink/scriptのみ・残CSSのurl()は不干渉・タグごと除去・マーカーも除去・推定なし
+  - テンプレートマーカー（通常生成・テンプレート書き出し両方で有効）: `<!-- distan:no-block-styles -->`＝ブロックCSS除去(wp-block-library/-theme link＋id が wp-block-*/global-styles* のインラインstyle全部＝library-inline/per-block/placeholder。wp-img-auto-sizesも対象)、`<!-- distan:drop-assets <prefix>... -->`＝出力相対パス前方一致でscript/style除去（plugin/coreは wp-content/plugins/・wp-includes/ のまま）。トップレベルlink/scriptのみ・残CSSのurl()は不干渉・タグごと除去・マーカーも除去・推定なし。通常生成でも apply_page_markers を書き出し前に適用（該当link/script＋inline除去、マーカーも除去）。共有ファイル実体は消さずページの参照タグだけ外す＝他ページ無傷
 - 生成完了フック（distan_after_generate）で自動デプロイに接続（Distan自体はデプロイしない）
 - デプロイフック（distan_dispatch）は目視確認後の手動ボタンで発火する人間のゲート。承認状態は持たず最終デプロイ時刻のみ記録。既定オフ
 

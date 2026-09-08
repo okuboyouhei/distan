@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.6.4
+Stable tag: 1.7.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -100,6 +100,10 @@ Yes, with an explicit opt-in. Name the query keys that change the page with the 
 2. 「使い方」ヘルプ。Distan の考え方（WordPress は作る場所、書き出した HTML が納品物）と、環境の確認 → 書き出し → 受け取り・公開の流れ、主な設定の要点を確認できます。
 
 == Changelog ==
+
+= 1.7.0 =
+* Improved: the distan:no-block-styles / distan:drop-assets markers now also take effect in a normal "static HTML" run, not only in the template export. On a marked page, the declared <link>/<script> tags and inline block styles are removed from that page's output; shared asset files are left in place so other pages that use them keep working.
+* Improved: the Markdown export (content.md) now preserves much more structure, so it reads better when fed to an AI. Tables become Markdown tables, code becomes fenced or inline code, images keep their alt text, and block quotes, bold/italic, ordered-list numbering, and horizontal rules are carried across. Each page section also records its source URL and meta description, and its title falls back to the first heading when a theme emits no <title>.
 
 = 1.6.4 =
 * Updated: the plugin screenshots — the full admin screen and the in-app help.

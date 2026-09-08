@@ -75,10 +75,24 @@ final class Distan_Markdown {
 			return null;
 		}
 
+		// The section is headed by the title, so if the body opens with that
+		// same title as a heading (common: the page's <h1>), drop the repeat.
+		// The delimiter is ~, not #, because the pattern itself starts with a
+		// literal # (the Markdown heading marker).
+		if ( '' !== $title ) {
+			$body = (string) preg_replace(
+				'~^\#{1,6}[ \t]+' . preg_quote( $title, '~' ) . '[ \t]*\R+~u',
+				'',
+				$body
+			);
+			$body = trim( $body );
+		}
+
 		return array(
-			'title' => $title,
-			'url'   => isset( $item['url'] ) ? (string) $item['url'] : '',
-			'body'  => $body,
+			'title'       => $title,
+			'url'         => isset( $item['url'] ) ? (string) $item['url'] : '',
+			'description' => self::extract_description( $html ),
+			'body'        => $body,
 		);
 	}
 
@@ -161,18 +175,35 @@ final class Distan_Markdown {
 		$heading = '' !== $section['title'] ? $section['title'] : $section['url'];
 
 		$lines   = array();
-		$lines[] = '---';
-		$lines[] = '';
 		$lines[] = '## ' . $heading;
+		$lines[] = '';
 		if ( '' !== $section['url'] ) {
-			$lines[] = '';
-			$lines[] = 'URL: ' . $section['url'];
+			$lines[] = '- 元URL: ' . $section['url'];
+		}
+		if ( ! empty( $section['description'] ) ) {
+			$lines[] = '- 概要: ' . $section['description'];
 		}
 		$lines[] = '';
 		$lines[] = $section['body'];
 		$lines[] = '';
 
 		return implode( "\n", $lines ) . "\n";
+	}
+
+	/**
+	 * Pull the meta description, if present, for per-page context.
+	 */
+	private static function extract_description( string $html ): string {
+		if ( ! preg_match( '#<head\b[^>]*>(.*?)</head>#is', $html, $head ) ) {
+			return '';
+		}
+		if ( ! preg_match( '#<meta\b[^>]*\bname=["\']description["\'][^>]*>#i', $head[1], $tag ) ) {
+			return '';
+		}
+		if ( ! preg_match( '#\bcontent=["\'](.*?)["\']#is', $tag[0], $m ) ) {
+			return '';
+		}
+		return trim( (string) preg_replace( '#\s+#u', ' ', self::decode( $m[1] ) ) );
 	}
 
 	/**
@@ -184,8 +215,22 @@ final class Distan_Markdown {
 
 			// Trim a common "Page Title - Site Name" / "Page Title | Site Name" suffix.
 			$title = (string) preg_replace( '#\s*[\|\-–—]\s*[^\|\-–—]+$#u', '', $title );
+			$title = trim( $title );
 
-			return trim( $title );
+			if ( '' !== $title ) {
+				return $title;
+			}
+		}
+
+		// No usable <title> (some classic themes never emit one). Fall back to
+		// the first heading in the content — usually the page title — so the
+		// section is labelled by name rather than by URL.
+		$region = self::isolate_region( $html );
+		if ( preg_match( '#<h1\b[^>]*>(.*?)</h1>#is', $region, $h ) ) {
+			$title = trim( self::decode( wp_strip_all_tags( $h[1] ) ) );
+			if ( '' !== $title ) {
+				return $title;
+			}
 		}
 
 		return '';
@@ -249,6 +294,70 @@ final class Distan_Markdown {
 	private static function html_to_markdown( string $html ): string {
 		$text = $html;
 
+		// Code first, so later passes never mangle its contents. <pre> becomes
+		// a fenced block; inline <code> becomes backticks.
+		$text = (string) preg_replace_callback(
+			'#<pre\b[^>]*>(.*?)</pre>#is',
+			static function ( $m ) {
+				$inner = (string) preg_replace( '#</?code\b[^>]*>#i', '', $m[1] );
+				$inner = wp_strip_all_tags( $inner );
+				$inner = trim( self::decode( $inner ), "\n" );
+				return "\n\n```\n" . $inner . "\n```\n\n";
+			},
+			$text
+		);
+		$text = (string) preg_replace_callback(
+			'#<code\b[^>]*>(.*?)</code>#is',
+			static function ( $m ) {
+				$inner = trim( self::decode( wp_strip_all_tags( $m[1] ) ) );
+				return '' !== $inner ? '`' . $inner . '`' : '';
+			},
+			$text
+		);
+
+		// Tables -> Markdown pipe tables. Cells keep a link's label but drop
+		// other decoration, so a stray tag or pipe never breaks the row.
+		$text = (string) preg_replace_callback(
+			'#<table\b[^>]*>(.*?)</table>#is',
+			static function ( $m ) {
+				if ( ! preg_match_all( '#<tr\b[^>]*>(.*?)</tr>#is', $m[1], $rows ) ) {
+					return '';
+				}
+				$grid = array();
+				foreach ( $rows[1] as $row ) {
+					if ( ! preg_match_all( '#<(?:td|th)\b[^>]*>(.*?)</(?:td|th)>#is', $row, $cells ) ) {
+						continue;
+					}
+					$line = array();
+					foreach ( $cells[1] as $cell ) {
+						$cell = (string) preg_replace( '#<a\b[^>]*>(.*?)</a>#is', '$1', $cell );
+						$cell = wp_strip_all_tags( $cell );
+						$cell = str_replace( '|', '\\|', self::decode( $cell ) );
+						$line[] = trim( (string) preg_replace( '#\s+#u', ' ', $cell ) );
+					}
+					$grid[] = $line;
+				}
+				if ( empty( $grid ) ) {
+					return '';
+				}
+				$width = 0;
+				foreach ( $grid as $line ) {
+					$width = max( $width, count( $line ) );
+				}
+				$fill = static function ( array $line ) use ( $width ) {
+					return array_pad( $line, $width, '' );
+				};
+				$out   = array();
+				$out[] = '| ' . implode( ' | ', $fill( $grid[0] ) ) . ' |';
+				$out[] = '| ' . implode( ' | ', array_fill( 0, $width, '---' ) ) . ' |';
+				foreach ( array_slice( $grid, 1 ) as $line ) {
+					$out[] = '| ' . implode( ' | ', $fill( $line ) ) . ' |';
+				}
+				return "\n\n" . implode( "\n", $out ) . "\n\n";
+			},
+			$text
+		);
+
 		// Headings h1-h6 -> Markdown headings.
 		for ( $level = 1; $level <= 6; $level++ ) {
 			$text = (string) preg_replace_callback(
@@ -261,7 +370,42 @@ final class Distan_Markdown {
 			);
 		}
 
-		// Links -> [text](href). Do this before stripping tags.
+		// Blockquotes -> "> ".
+		$text = (string) preg_replace_callback(
+			'#<blockquote\b[^>]*>(.*?)</blockquote>#is',
+			static function ( $m ) {
+				$inner = trim( self::decode( wp_strip_all_tags( $m[1] ) ) );
+				if ( '' === $inner ) {
+					return '';
+				}
+				$quoted = array();
+				foreach ( preg_split( '#\n+#', $inner ) ?: array() as $line ) {
+					$line = trim( (string) $line );
+					if ( '' !== $line ) {
+						$quoted[] = '> ' . $line;
+					}
+				}
+				return "\n\n" . implode( "\n", $quoted ) . "\n\n";
+			},
+			$text
+		);
+
+		// Images -> ![alt](src). Alt text is content an AI should see, so it is
+		// kept even when the src is dropped.
+		$text = (string) preg_replace_callback(
+			'#<img\b[^>]*>#i',
+			static function ( $m ) {
+				$src = preg_match( '#\bsrc=["\']([^"\']*)["\']#i', $m[0], $s ) ? trim( $s[1] ) : '';
+				$alt = preg_match( '#\balt=["\']([^"\']*)["\']#i', $m[0], $a ) ? trim( self::decode( $a[1] ) ) : '';
+				if ( '' === $src ) {
+					return '' !== $alt ? $alt : '';
+				}
+				return '![' . $alt . '](' . $src . ')';
+			},
+			$text
+		);
+
+		// Links -> [text](href).
 		$text = (string) preg_replace_callback(
 			'#<a\b[^>]*href=["\']([^"\']*)["\'][^>]*>(.*?)</a>#is',
 			static function ( $m ) {
@@ -278,7 +422,46 @@ final class Distan_Markdown {
 			$text
 		);
 
-		// List items -> "- ...".
+		// Emphasis -> **bold** / *italic*.
+		$text = (string) preg_replace_callback(
+			'#<(?:strong|b)\b[^>]*>(.*?)</(?:strong|b)>#is',
+			static function ( $m ) {
+				$inner = trim( wp_strip_all_tags( $m[1] ) );
+				return '' !== $inner ? '**' . $inner . '**' : '';
+			},
+			$text
+		);
+		$text = (string) preg_replace_callback(
+			'#<(?:em|i)\b[^>]*>(.*?)</(?:em|i)>#is',
+			static function ( $m ) {
+				$inner = trim( wp_strip_all_tags( $m[1] ) );
+				return '' !== $inner ? '*' . $inner . '*' : '';
+			},
+			$text
+		);
+
+		// Ordered lists -> numbered items (preserving sequence).
+		$text = (string) preg_replace_callback(
+			'#<ol\b[^>]*>(.*?)</ol>#is',
+			static function ( $m ) {
+				if ( ! preg_match_all( '#<li\b[^>]*>(.*?)</li>#is', $m[1], $items ) ) {
+					return '';
+				}
+				$out = array();
+				$n   = 0;
+				foreach ( $items[1] as $item ) {
+					$inner = trim( self::decode( wp_strip_all_tags( $item ) ) );
+					if ( '' !== $inner ) {
+						++$n;
+						$out[] = $n . '. ' . $inner;
+					}
+				}
+				return "\n" . implode( "\n", $out ) . "\n";
+			},
+			$text
+		);
+
+		// Remaining list items (unordered) -> "- ".
 		$text = (string) preg_replace_callback(
 			'#<li\b[^>]*>(.*?)</li>#is',
 			static function ( $m ) {
@@ -288,7 +471,8 @@ final class Distan_Markdown {
 			$text
 		);
 
-		// Paragraphs and breaks -> newlines.
+		// Horizontal rule, paragraphs, breaks.
+		$text = (string) preg_replace( '#<hr\s*/?>#i', "\n\n---\n\n", $text );
 		$text = (string) preg_replace( '#</p>#i', "\n\n", $text );
 		$text = (string) preg_replace( '#<br\s*/?>#i', "\n", $text );
 

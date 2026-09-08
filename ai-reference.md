@@ -29,6 +29,7 @@ WordPress を制作環境として使い、納品用の静的 HTML を書き出�
 - **検索エンジンの扱い** — noindex を除去（本番納品・既定）か、残す（テスト環境での確認用）。
 - **WordPress の痕跡を除く** — generator / RSD / oEmbed / 絵文字 / ショートリンク等のメタ情報を除去（既定オン）。※ ブロック用 CSS やプラグイン JS は対象外。特定ページから外すのはテンプレート書き出しのマーカー。
 - **Markdown を書き出す** — 全ページ本文を 1 ファイル `content.md` に（AI ツール向け）。既定オフ。
+  - Markdown 書き出しの変換（html_to_markdown）: 見出し/リンク/箇条書きに加え、表→パイプ表、`<pre>`→フェンス・`<code>`→バッククォート、`<img>`→`![alt](src)`、blockquote→`>`、strong/em→`**`/`*`、`<ol>`→番号付き、`<hr>`→`---`。パス順は「コード保護→表→見出し→引用→画像→リンク→強調→リスト→hr/p/br→strip」。表セルはリンクのラベルのみ残し装飾は素テキスト。各セクションに title/元URL/description（metaから）を付与。title は <title>→本文の最初の h1→URL の順でフォールバック（title-tag 非対応テーマ対策）、本文先頭がそのタイトル見出しと重複する場合は本文側を除去
 - **サイトマップを書き出す** — `sitemap.xml`。除外パターンを指定できる。既定オフ。
 - **robots.txt を書き出す** — 最小構成（`Allow: /`）。既定オフ。
 - **差分ZIP** — 生成画面に「差分ZIP（変更分のみ）」を表示（既定オン。検知自体は常に走る）。
@@ -76,7 +77,7 @@ WordPress を制作環境として使い、納品用の静的 HTML を書き出�
 - **テンプレート書き出し** — 生成済みページを 1 枚選ぶと、そのページ＋そのページが実際に参照するアセットだけ（CSS・JS・フォント・画像。スタイルシートの `url()`・`@import` も再帰的に辿る）を本番と同じ相対パスで ZIP 化（`Distan_Report::build_template_zip`）。共通ヘッダー・フッターに沿った特設ページ制作を外部に委ねる際の「雛形」として渡す用途。全ページ分のアセットは同梱しない（必要なのは共通 chrome だけ）。ナビ等の遷移先ページはこの 1 枚納品では欠落する前提。ZIP ルートに制作者向け `README.md`（head/header/footer は不可侵・本文だけ差し替え・相対パス維持）を同梱。本文領域の機械的な切り出しは行わない（構造マップで露呈した「沈黙して壊れる」失敗を避け、ページを丸ごと渡して差し替え箇所を指示する）。参照解決は完成済み出力を読むので状態が確定しており、動的読み込みの取りこぼしはプレビューで見た目が崩れて即座に気づける。生成画面の「テンプレート書き出し」設定（既定オン）で表示を切替
 - **プラグイン一覧の設定リンク** — `plugin_action_links_{basename}` で admin.php?page=distan への「設定」を先頭に追加（Distan_Admin::plugin_action_links）
 - **テンプレート候補のライブ絞り込み** — 候補は wp_json_encode で Alpine の x-data に渡し、`<template x-for>` で option をタイトル部分一致フィルタ描画（q は type=search 入力、送信は既存の GET のまま）。生成経路には非依存＝フロント完結
-  - テンプレートマーカー（テンプレート書き出し限定）: HTMLコメント `<!-- distan:no-block-styles -->`（wp-block-library/-theme の link ＋ id が `wp-block-` で始まる/`global-styles` を含むインライン `<style>` を全除去。placeholder や per-block の *-inline-css も対象。`wp-img-auto-sizes-*` も対象）と `<!-- distan:drop-assets <prefix>... -->`（src/href を出力相対パスに解決し前方一致でスクリプト/スタイルを除去。plugin/core は畳まれず wp-content/plugins/・wp-includes/ のまま残るのでその構造で指定）。トップレベルの link/script のみ対象で、残した CSS の url() 追従先には触れない（dangling を作らない）。参照タグごと除去＋マーカーコメント自体も除去。推定はせず宣言に従う。実装は `clean_template_html` / `parse_template_markers`
+  - テンプレートマーカー（通常生成・テンプレート書き出しの両方で有効）: HTMLコメント `<!-- distan:no-block-styles -->`（wp-block-library/-theme の link ＋ id が `wp-block-` で始まる/`global-styles` を含むインライン `<style>` を全除去。placeholder や per-block の *-inline-css も対象。`wp-img-auto-sizes-*` も対象）と `<!-- distan:drop-assets <prefix>... -->`（src/href を出力相対パスに解決し前方一致でスクリプト/スタイルを除去。plugin/core は畳まれず wp-content/plugins/・wp-includes/ のまま残るのでその構造で指定）。トップレベルの link/script のみ対象で、残した CSS の url() 追従先には触れない（dangling を作らない）。参照タグごと除去＋マーカーコメント自体も除去。推定はせず宣言に従う。実装は `clean_template_html` / `parse_template_markers`。通常生成でも `Distan_Report::apply_page_markers` を書き出し直前に適用し、該当 `<link>`/`<script>`＋inline block styles を除去（マーカーコメントも除去）。**共有アセットのファイル実体は削除しない**＝そのページの参照タグだけ外す（他ページは無傷）。テンプレート書き出しは従来どおりファイル収集からも除外
 - **生成完了フック** — `distan_after_generate`（アクション）で、生成後に任意のデプロイ処理（git push / rsync / Webhook 等）を繋げる。Distan 自体はデプロイしない・認証情報を持たない
 - **デプロイフック** — `distan_dispatch`（アクション）は、生成物を目視確認したあと手動の「デプロイ」ボタンを押したときだけ発火する。`distan_after_generate` が自動（生成のたびに必ず発火）なのに対し、`distan_dispatch` は人間のゲート。プレビュー配信は前者、本番へのデプロイは後者、と二層に分けられる。承認状態は持たず、最終デプロイ時刻（`distan_last_dispatch`）だけを記録する。ボタンは既定オフ、設定で有効化
 

@@ -305,7 +305,13 @@ class Distan_Generator {
 		// directory. It always gets absolute URLs.
 		$rewritten = Distan_Urls::rewrite( $html, $item['path'], $is_404 );
 
-		if ( ! Distan_Paths::write( $item['path'], $rewritten['html'] ) ) {
+		// Honour the page's own distan: markers (no-block-styles / drop-assets)
+		// in normal generation too: strip the declared <link>/<script> tags and
+		// inline block styles from this page's output. Shared asset files are
+		// left in place — only this page stops referencing them.
+		$out_html = Distan_Report::apply_page_markers( $rewritten['html'], $item['path'] );
+
+		if ( ! Distan_Paths::write( $item['path'], $out_html ) ) {
 			return array(
 				'error' => sprintf(
 					/* translators: %s: output path */
@@ -322,9 +328,9 @@ class Distan_Generator {
 		$script_tag  = '<' . 'script';
 		$has_modules = (bool) preg_match(
 			'#' . $script_tag . '[^>]+type=([\'"])module\1#i',
-			$rewritten['html']
-		) || false !== stripos( $rewritten['html'], 'type="importmap"' )
-			|| false !== stripos( $rewritten['html'], "type='importmap'" );
+			$out_html
+		) || false !== stripos( $out_html, 'type="importmap"' )
+			|| false !== stripos( $out_html, "type='importmap'" );
 
 		$section = null;
 		if ( ! $is_404 && Distan_Markdown::is_enabled() ) {
@@ -338,7 +344,7 @@ class Distan_Generator {
 			// Hash the exact bytes written to disk so the diff reflects what
 			// a deploy would actually upload. sha1 is change-detection, not
 			// security, so its speed and ubiquity are what matter here.
-			'hash'        => sha1( $rewritten['html'] ),
+			'hash'        => sha1( $out_html ),
 		);
 	}
 
