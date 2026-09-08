@@ -588,6 +588,56 @@ class Distan_Report {
 	}
 
 	/**
+	 * Apply a page's own distan: markers to its finished output HTML during a
+	 * normal generation. Strips the block CSS / dropped scripts and styles the
+	 * page declares, plus the marker comments — editing only the HTML. The
+	 * shared asset files are left untouched, because other pages may still
+	 * reference them; here we only remove this page's <link>/<script> tags, so
+	 * the page stops loading them while the files stay for whoever needs them.
+	 * Returns the HTML unchanged when the page carries no markers.
+	 *
+	 * @param string $html        The page's finished (rewritten) output HTML.
+	 * @param string $output_path The page's output-relative path.
+	 */
+	public static function apply_page_markers( string $html, string $output_path ): string {
+		$marks = self::parse_template_markers( $html );
+
+		if ( empty( $marks['no_block_styles'] ) && empty( $marks['drop_prefixes'] ) ) {
+			return $html;
+		}
+
+		return self::clean_template_html( $html, self::dir_of( $output_path ), self::live_origins(), $marks );
+	}
+
+	/**
+	 * Same-origin prefixes for the live site, used to resolve absolute-mode
+	 * references while markers run during generation (before a manifest
+	 * exists). Mirrors artifact_origins, but from the live settings.
+	 *
+	 * @return array<int, string>
+	 */
+	private static function live_origins(): array {
+		$candidates = array(
+			(string) Distan::settings()['site_url'],
+			(string) home_url( '/' ),
+		);
+
+		$origins = array();
+		foreach ( $candidates as $candidate ) {
+			$candidate = trim( $candidate );
+			if ( '' === $candidate ) {
+				continue;
+			}
+			$origin = trailingslashit( $candidate );
+			if ( ! in_array( $origin, $origins, true ) ) {
+				$origins[] = $origin;
+			}
+		}
+
+		return $origins;
+	}
+
+	/**
 	 * Read the author's template markers from the page HTML.
 	 *
 	 * `<!-- distan:no-block-styles -->` drops the block library CSS and the
