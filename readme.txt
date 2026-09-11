@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.7.0
+Stable tag: 1.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -80,7 +80,7 @@ Distan collects assets by reading the generated HTML and CSS, so a path built in
 
 = Can I export the content for AI tools? =
 
-Yes. Enable the Markdown export and Distan writes `content.md`, combining every page's main content into one file with production URLs — ready to hand to an AI notebook or a retrieval index. An optional `content.local.md` keeps development URLs.
+Yes. Enable the Markdown export and Distan writes `content.md`, combining every page's main content into one file with production URLs — ready to hand to an AI notebook or a retrieval index. An optional `content.local.md` keeps development URLs. You can also narrow what goes into it by post type and publish date, and hand-pick individual fixed pages, so the transcript can be limited to (for example) just your articles while the static site is still delivered in full.
 
 = Can I open the generated files directly? =
 
@@ -100,6 +100,11 @@ Yes, with an explicit opt-in. Name the query keys that change the page with the 
 2. 「使い方」ヘルプ。Distan の考え方（WordPress は作る場所、書き出した HTML が納品物）と、環境の確認 → 書き出し → 受け取り・公開の流れ、主な設定の要点を確認できます。
 
 == Changelog ==
+
+= 1.8.0 =
+* Added: the Markdown export (content.md) can now be narrowed by post type and by publish date, and specific fixed pages can be force-included, so a site can be delivered whole while only, say, its articles within a date window are transcribed for an AI. With no filter set the export still covers every page as before (posts, custom types, fixed pages, the front page and archives). When you do filter, post types are chosen with checkboxes and the publish-date range is inclusive on both ends (either bound may be left open); while filtering, pages and archives drop out unless a page is added individually from the live title search, which force-includes it. The static HTML output (dist/) is unchanged by any of this.
+* Added: an optional "remove HTML comments" setting. When enabled, plain HTML comments (<!-- ... -->) left by plugins and themes are stripped from the delivered pages at write time. Comment-like text inside <script>, <style>, <textarea> and <pre> is shielded, and IE conditional comments (<!--[if ...]>) are kept because they can wrap real markup. Off by default; the static output is unchanged unless you turn it on.
+* Changed: the admin screen's own styles and scripts are now cache-busted by file modification time, so an updated build always loads its current assets instead of a stale cached copy.
 
 = 1.7.0 =
 * Improved: the distan:no-block-styles / distan:drop-assets markers now also take effect in a normal "static HTML" run, not only in the template export. On a marked page, the declared <link>/<script> tags and inline block styles are removed from that page's output; shared asset files are left in place so other pages that use them keep working.

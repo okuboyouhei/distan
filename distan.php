@@ -3,7 +3,7 @@
  * Plugin Name: Distan
  * Plugin URI:  https://github.com/okuboyouhei/distan
  * Description: dist で開発する、WordPress静的サイトジェネレーター。HTML納品案件のために、WordPressを制作環境として使い、余計なものを含まない静的HTMLを書き出します。
- * Version:     1.7.0
+ * Version:     1.8.0
  * Author:      Youhei Okubo
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'DISTAN_VERSION', '1.7.0' );
+define( 'DISTAN_VERSION', '1.8.0' );
 define( 'DISTAN_FILE', __FILE__ );
 define( 'DISTAN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DISTAN_URL', plugin_dir_url( __FILE__ ) );
@@ -114,8 +114,13 @@ final class Distan {
 			'clean_html'    => true,
 			'strip_noindex' => true,   // false keeps robots noindex (staging preview).
 			'keep_indent'   => true,
+			'strip_comments' => false, // Remove plain HTML comments from the delivered pages (opt-in).
 			'export_markdown' => false, // Write a combined content.md for AI tools (Gemini Notebook, formerly NotebookLM).
 			'export_markdown_local' => false, // Also write content.local.md keeping development URLs.
+			'md_post_types'   => array(), // Markdown: limit content.md to these post types. Empty = every type except 'page'.
+			'md_date_from'    => '',    // Markdown: only posts published on/after this date (YYYY-MM-DD). Empty = no lower bound.
+			'md_date_to'      => '',    // Markdown: only posts published on/before this date (YYYY-MM-DD). Empty = no upper bound.
+			'md_pages'        => array(), // Markdown: page IDs hand-picked to always include, ignoring the date filter.
 			'sitemap'         => false, // Write a standards-compliant sitemap.xml from the generated pages.
 			'sitemap_exclude' => '',    // Newline-separated slug prefixes (/private/) or substrings (draft) to exclude.
 			'robots'          => false, // Write a minimal robots.txt (Allow: /, plus Sitemap: when sitemap is on).
