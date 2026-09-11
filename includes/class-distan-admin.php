@@ -1059,7 +1059,7 @@ class Distan_Admin {
 								<p class="description">
 									<?php esc_html_e( '開発・データ管理用に、URL を置換していない版も出力します。納品物には通常不要です。', 'distan' ); ?>
 								</p>
-								<div class="hgp-md-filter" x-show="mdOn" x-cloak>
+								<div class="hgp-md-filter dsp-flow" x-show="mdOn" x-cloak>
 									<p class="hgp-md-filter__intro"><?php esc_html_e( 'content.md に含める範囲を絞り込めます。何も指定しなければ従来どおり全ページ（固定ページ・トップ・アーカイブ含む）が対象です。静的サイト（dist/）の生成内容は変わりません。', 'distan' ); ?></p>
 
 									<?php
@@ -1067,7 +1067,7 @@ class Distan_Admin {
 									$md_selected = (array) $settings['md_post_types'];
 									?>
 									<?php if ( ! empty( $md_types ) ) : ?>
-										<div class="hgp-md-filter__group">
+										<div class="hgp-md-filter__group dsp-flow">
 											<div class="hgp-md-filter__head">
 												<div class="hgp-md-filter__legend"><?php esc_html_e( '投稿タイプ', 'distan' ); ?></div>
 												<button type="button" class="hgp-md-filter__reset" @click="$refs.ptypes.querySelectorAll( 'input' ).forEach( c =&gt; c.checked = false )"><?php esc_html_e( 'リセット', 'distan' ); ?></button>
@@ -1086,7 +1086,7 @@ class Distan_Admin {
 										</div>
 									<?php endif; ?>
 
-									<div class="hgp-md-filter__group">
+									<div class="hgp-md-filter__group dsp-flow">
 										<div class="hgp-md-filter__head">
 											<div class="hgp-md-filter__legend"><?php esc_html_e( '公開日（この範囲のみ）', 'distan' ); ?></div>
 											<button type="button" class="hgp-md-filter__reset" @click="dfrom = ''; dto = ''"><?php esc_html_e( 'リセット', 'distan' ); ?></button>
@@ -1113,7 +1113,7 @@ class Distan_Admin {
 									$md_picked = array_values( array_unique( array_map( 'intval', (array) $settings['md_pages'] ) ) );
 									?>
 									<?php if ( ! empty( $md_page_list ) ) : ?>
-										<div class="hgp-md-filter__group" x-data='{ q: "", picks: <?php echo esc_attr( (string) wp_json_encode( $md_picked ) ); ?>, pages: <?php echo esc_attr( (string) wp_json_encode( $md_page_list ) ); ?>, candidates() { const s = this.q.trim().toLowerCase(); return this.pages.filter( p => ! this.picks.includes( p.id ) && ( s === "" || p.label.toLowerCase().includes( s ) ) ); }, add( v ) { const id = parseInt( v, 10 ); if ( id && ! this.picks.includes( id ) ) { this.picks = [ ...this.picks, id ]; } }, remove( id ) { this.picks = this.picks.filter( x => x !== id ); }, labelFor( id ) { const p = this.pages.find( p => p.id === id ); return p ? p.label : ( "#" + id ); } }'>
+										<div class="hgp-md-filter__group dsp-flow" x-data='{ q: "", picks: <?php echo esc_attr( (string) wp_json_encode( $md_picked ) ); ?>, pages: <?php echo esc_attr( (string) wp_json_encode( $md_page_list ) ); ?>, candidates() { const s = this.q.trim().toLowerCase(); return this.pages.filter( p => ! this.picks.includes( p.id ) && ( s === "" || p.label.toLowerCase().includes( s ) ) ); }, add( v ) { const id = parseInt( v, 10 ); if ( id && ! this.picks.includes( id ) ) { this.picks = [ ...this.picks, id ]; } }, remove( id ) { this.picks = this.picks.filter( x => x !== id ); }, labelFor( id ) { const p = this.pages.find( p => p.id === id ); return p ? p.label : ( "#" + id ); } }'>
 											<div class="hgp-md-filter__head">
 												<div class="hgp-md-filter__legend"><?php esc_html_e( '固定ページを個別に含める', 'distan' ); ?></div>
 												<button type="button" class="hgp-md-filter__reset" @click="picks = []; q = ''"><?php esc_html_e( 'リセット', 'distan' ); ?></button>

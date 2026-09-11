@@ -113,6 +113,50 @@ look at (broken links, warnings) without coloring the whole sheet. The section
 sub-navigation is a plain in-flow bar, not a sticky one — it scrolls with the
 page so it never covers a heading beneath it.
 
+## Spacing & rhythm
+
+Vertical space is a *system*, not a per-element decision. Reaching for a fresh
+`margin` on each new block is what makes layouts drift and need re-tuning, so
+Distan sets spacing with one rule and a small scale.
+
+**The scale** (`--sp-*`, on `.distan-wrap`): `xs 6` inside a control
+(icon-to-label, checkbox-to-text); `sm 12` between a heading/label and its
+control, or a control and its hint; `md 18` between sibling blocks or rows;
+`lg 26` between sections of a card; `xl 40` for major breaks. Pick the step by
+role, not by eye — if a gap seems to want an in-between value, the elements
+probably belong to different steps.
+
+**Flow, not per-element margins.** Wrap a block's children in `.dsp-flow` and
+consecutive siblings get one consistent gap (`--flow`, defaulting to `--sp-md`);
+set `--flow: var(--sp-sm)` on a tighter container. Children set no top/bottom
+margins of their own — the flow owns vertical space, so there is nothing to
+re-tune when you add or reorder a row. Override `--flow` on the container, not
+`margin` on the child. The Markdown-filter panel (`.hgp-md-filter`) is the
+worked example: the panel flows its intro and groups at `md`, each group flows
+its rows at `sm`, and the only remaining vertical rule is the section hairline.
+
+**Beat WordPress, don't fight it.** Content inside a `.form-table` cell competes
+with core's own `td p` / `td label` margins, which win on specificity against a
+single class. That is why `.dsp-flow` is scoped `.distan-wrap .dsp-flow` (two
+classes): it neutralises those defaults so the flow rhythm is the single source.
+Any new component rule inside `.form-table` must clear the same bar — scope it
+under `.distan-wrap`, or it loses and you "mysteriously" need a margin patch.
+
+**Measure.** Prose (intros, hints) runs the full column width, like every other
+WordPress description — don't cap it at an arbitrary `ch`, or text wraps early
+and leaves a ragged void under the full-width hairlines.
+
+### Adding a settings block — checklist
+
+1. Put the block's rows in a `.dsp-flow` container and set `--flow` (`sm` for a
+   tight group, `md`/`lg` for looser). Add no per-row `margin`.
+2. Headings use `--fs-body` bold in `--dsp-ink`; hints use `.description` with
+   no width cap. A section divider is a single `--dsp-line` hairline.
+3. If it lives in a `.form-table` cell, scope every rule under `.distan-wrap`.
+4. Reserve the accent (`--dsp-stamp`) for a primary action; 2px radius max, no
+   shadow. Confirm in a real admin screen (admin assets are `filemtime`-busted,
+   so changes show without a hard reload).
+
 ## Motion
 
 ```yaml

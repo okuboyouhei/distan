@@ -1131,30 +1131,48 @@ html {
    hand-picked pages. Sits under the "write Markdown" toggle and follows the
    same slip aesthetic — hairline groups doing the structural work, 2px
    radius, tokens throughout, accent used sparingly. */
+/* Vertical rhythm utility — see DESIGN.md "Spacing & rhythm". Wrap a block's
+   children in .dsp-flow and consecutive siblings get one consistent gap
+   (override --flow for a tighter or looser run). Scoped under .distan-wrap so
+   it also neutralises WordPress's default p/label margins inside .form-table
+   cells, which would otherwise win on specificity. Prefer this over hand-set
+   per-element margins. */
+.distan-wrap .dsp-flow > * {
+	margin-top: 0;
+	margin-bottom: 0;
+}
+
+.distan-wrap .dsp-flow > * + * {
+	margin-top: var(--flow, var(--sp-md));
+}
+
+/* Markdown filter — a worked example of the flow rhythm: the panel spaces its
+   intro and groups at --sp-md; each group spaces its own rows at --sp-sm. No
+   per-element vertical margins live below; only the section hairline and the
+   inner flex layouts are component concerns. */
 .hgp-md-filter {
+	--flow: var(--sp-md);
 	margin-top: var(--sp-md);
 	padding-top: var(--sp-md);
 	border-top: 1px solid var(--dsp-line);
 }
 
 .hgp-md-filter .hgp-md-filter__intro {
-	margin: 0 0 var(--sp-md);
 	font-size: var(--fs-body);
 	color: var(--dsp-slate);
 }
 
 .hgp-md-filter__group {
-	margin: 0;
+	--flow: var(--sp-sm);
 }
 
 .hgp-md-filter__group + .hgp-md-filter__group {
-	margin-top: var(--sp-md);
 	padding-top: var(--sp-md);
 	border-top: 1px solid var(--dsp-line);
 }
 
 .hgp-md-filter__legend {
-	margin: 0 0 var(--sp-sm);
+	margin: 0;
 	font-size: var(--fs-body);
 	font-weight: 700;
 	color: var(--dsp-ink);
@@ -1165,11 +1183,6 @@ html {
 	align-items: baseline;
 	justify-content: space-between;
 	gap: var(--sp-md);
-	margin: 0 0 var(--sp-sm);
-}
-
-.hgp-md-filter__head .hgp-md-filter__legend {
-	margin: 0;
 }
 
 .hgp-md-filter__reset {
@@ -1186,10 +1199,6 @@ html {
 .hgp-md-filter__reset:hover,
 .hgp-md-filter__reset:focus {
 	color: var(--dsp-stamp);
-}
-
-.hgp-md-filter .description {
-	margin: var(--sp-sm) 0 0;
 }
 
 /* Post types — labels wrap inline as a row of chips. */
@@ -1250,7 +1259,6 @@ html {
 /* Hand-picked pages — search + add-dropdown row (reuses .hgp-template__row),
    selected pages shown as removable chips. */
 .hgp-md-filter__count {
-	margin: var(--sp-xs) 0 0;
 	font-size: var(--fs-meta);
 	color: var(--dsp-slate);
 }
@@ -1259,7 +1267,6 @@ html {
 	display: flex;
 	flex-wrap: wrap;
 	gap: var(--sp-xs);
-	margin-top: var(--sp-sm);
 }
 
 .hgp-md-filter__chip {
