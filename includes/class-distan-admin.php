@@ -317,8 +317,27 @@ class Distan_Admin {
 		$out['clean_html']    = ! empty( $input['clean_html'] );
 		$out['strip_noindex'] = ! empty( $input['strip_noindex'] );
 		$out['keep_indent'] = isset( $input['keep_indent'] ) ? ! empty( $input['keep_indent'] ) : true;
+		$out['strip_comments'] = ! empty( $input['strip_comments'] );
 		$out['export_markdown'] = ! empty( $input['export_markdown'] );
 		$out['export_markdown_local'] = ! empty( $input['export_markdown_local'] );
+
+		// Markdown filter: post types (never 'page'; that has its own track).
+		$md_types_in  = isset( $input['md_post_types'] ) ? (array) $input['md_post_types'] : array();
+		$md_types_ok  = array_values( array_filter( Distan_Collector::post_types(), static function ( $t ) {
+			return 'page' !== $t;
+		} ) );
+		$out['md_post_types'] = array_values( array_intersect(
+			array_map( 'sanitize_key', array_map( 'strval', $md_types_in ) ),
+			$md_types_ok
+		) );
+
+		// Markdown filter: publish-date range (YYYY-MM-DD, or empty).
+		$out['md_date_from'] = self::sanitize_ymd( isset( $input['md_date_from'] ) ? (string) $input['md_date_from'] : '' );
+		$out['md_date_to']   = self::sanitize_ymd( isset( $input['md_date_to'] ) ? (string) $input['md_date_to'] : '' );
+
+		// Markdown filter: hand-picked page IDs.
+		$md_pages_in     = isset( $input['md_pages'] ) ? (array) $input['md_pages'] : array();
+		$out['md_pages'] = array_values( array_unique( array_filter( array_map( 'intval', $md_pages_in ) ) ) );
 
 		$out['sitemap']         = ! empty( $input['sitemap'] );
 		$out['sitemap_exclude'] = isset( $input['sitemap_exclude'] )
@@ -330,6 +349,22 @@ class Distan_Admin {
 		$out['enable_dispatch'] = ! empty( $input['enable_dispatch'] );
 
 		return $out;
+	}
+
+	/**
+	 * Validate a YYYY-MM-DD date, returning '' for anything malformed.
+	 *
+	 * @param string $value Raw input.
+	 * @return string A real calendar date as YYYY-MM-DD, or ''.
+	 */
+	private static function sanitize_ymd( string $value ): string {
+		$value = trim( $value );
+		if ( '' !== $value
+			&& preg_match( '/^(\d{4})-(\d{2})-(\d{2})$/', $value, $m )
+			&& checkdate( (int) $m[2], (int) $m[3], (int) $m[1] ) ) {
+			return $value;
+		}
+		return '';
 	}
 
 	/**
@@ -370,18 +405,23 @@ class Distan_Admin {
 			return;
 		}
 
+		$css_path = DISTAN_DIR . 'assets/css/distan-admin.css';
+		$js_path  = DISTAN_DIR . 'assets/js/distan-admin.js';
+		$css_ver  = file_exists( $css_path ) ? (string) filemtime( $css_path ) : DISTAN_VERSION;
+		$js_ver   = file_exists( $js_path ) ? (string) filemtime( $js_path ) : DISTAN_VERSION;
+
 		wp_enqueue_style(
 			'distan-admin',
 			DISTAN_URL . 'assets/css/distan-admin.css',
 			array(),
-			DISTAN_VERSION
+			$css_ver
 		);
 
 		wp_enqueue_script(
 			'distan-admin',
 			DISTAN_URL . 'assets/js/distan-admin.js',
 			array(),
-			DISTAN_VERSION,
+			$js_ver,
 			true
 		);
 
@@ -985,6 +1025,18 @@ class Distan_Admin {
 								</div>
 							</td>
 						</tr>
+						<tr id="set-strip-comments">
+							<th scope="row"><?php esc_html_e( 'HTMLコメントを削除', 'distan' ); ?></th>
+							<td>
+								<label>
+									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[strip_comments]" value="1" <?php checked( ! empty( $settings['strip_comments'] ) ); ?>>
+									<?php esc_html_e( '納品HTMLからコメント（<!-- ... -->）を取り除く', 'distan' ); ?>
+								</label>
+								<p class="description">
+									<?php esc_html_e( 'プラグインやテーマが残す HTML コメントを書き出し時に削除します。<script>・<style>・<textarea>・<pre> の中身は保護し、IE 条件付きコメント（<!--[if ...]>）は中に実マークアップを含みうるため残します。既定オフ。', 'distan' ); ?>
+								</p>
+							</td>
+						</tr>
 						</table>
 
 						<h3 class="hgp-settings-group"><?php esc_html_e( '追加オプション', 'distan' ); ?></h3>
@@ -992,9 +1044,9 @@ class Distan_Admin {
 						<table class="form-table" role="presentation">
 							<tr id="set-markdown">
 								<th scope="row"><?php esc_html_e( 'Markdown を書き出す', 'distan' ); ?></th>
-							<td>
+							<td x-data="{ mdOn: <?php echo ! empty( $settings['export_markdown'] ) ? 'true' : 'false'; ?>, dfrom: '<?php echo esc_js( (string) $settings['md_date_from'] ); ?>', dto: '<?php echo esc_js( (string) $settings['md_date_to'] ); ?>' }">
 								<label>
-									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[export_markdown]" value="1" <?php checked( ! empty( $settings['export_markdown'] ) ); ?>>
+									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[export_markdown]" value="1" @change="mdOn = $event.target.checked" <?php checked( ! empty( $settings['export_markdown'] ) ); ?>>
 									<?php esc_html_e( 'サイト全体を content.md にまとめる', 'distan' ); ?>
 								</label>
 								<p class="description">
@@ -1007,6 +1059,93 @@ class Distan_Admin {
 								<p class="description">
 									<?php esc_html_e( '開発・データ管理用に、URL を置換していない版も出力します。納品物には通常不要です。', 'distan' ); ?>
 								</p>
+								<div class="hgp-md-filter" x-show="mdOn" x-cloak>
+									<p class="hgp-md-filter__intro"><?php esc_html_e( 'content.md に含める範囲を絞り込めます。何も指定しなければ従来どおり全ページ（固定ページ・トップ・アーカイブ含む）が対象です。静的サイト（dist/）の生成内容は変わりません。', 'distan' ); ?></p>
+
+									<?php
+									$md_types    = array_values( array_filter( Distan_Collector::post_types(), static function ( $t ) { return 'page' !== $t; } ) );
+									$md_selected = (array) $settings['md_post_types'];
+									?>
+									<?php if ( ! empty( $md_types ) ) : ?>
+										<div class="hgp-md-filter__group">
+											<div class="hgp-md-filter__head">
+												<div class="hgp-md-filter__legend"><?php esc_html_e( '投稿タイプ', 'distan' ); ?></div>
+												<button type="button" class="hgp-md-filter__reset" @click="$refs.ptypes.querySelectorAll( 'input' ).forEach( c =&gt; c.checked = false )"><?php esc_html_e( 'リセット', 'distan' ); ?></button>
+											</div>
+											<div class="hgp-md-filter__types" x-ref="ptypes">
+												<?php foreach ( $md_types as $md_type ) : ?>
+													<?php $md_obj = get_post_type_object( $md_type ); ?>
+													<label class="hgp-md-filter__type">
+														<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[md_post_types][]" value="<?php echo esc_attr( $md_type ); ?>" <?php checked( in_array( $md_type, $md_selected, true ) ); ?>>
+														<span><?php echo esc_html( $md_obj ? $md_obj->labels->name : $md_type ); ?></span>
+														<code class="hgp-md-filter__slug"><?php echo esc_html( $md_type ); ?></code>
+													</label>
+												<?php endforeach; ?>
+											</div>
+											<p class="description"><?php esc_html_e( 'チェックしたタイプだけに絞ります（未チェックなら投稿タイプでは絞り込みません）。固定ページは下の個別指定で含めます。', 'distan' ); ?></p>
+										</div>
+									<?php endif; ?>
+
+									<div class="hgp-md-filter__group">
+										<div class="hgp-md-filter__head">
+											<div class="hgp-md-filter__legend"><?php esc_html_e( '公開日（この範囲のみ）', 'distan' ); ?></div>
+											<button type="button" class="hgp-md-filter__reset" @click="dfrom = ''; dto = ''"><?php esc_html_e( 'リセット', 'distan' ); ?></button>
+										</div>
+										<div class="hgp-md-filter__dates">
+											<label class="hgp-md-filter__date"><?php esc_html_e( '開始', 'distan' ); ?>
+												<input type="date" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[md_date_from]" x-model="dfrom" :max="dto || null" value="<?php echo esc_attr( (string) $settings['md_date_from'] ); ?>">
+											</label>
+											<span class="hgp-md-filter__dash" aria-hidden="true">〜</span>
+											<label class="hgp-md-filter__date"><?php esc_html_e( '終了', 'distan' ); ?>
+												<input type="date" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[md_date_to]" x-model="dto" :min="dfrom || null" value="<?php echo esc_attr( (string) $settings['md_date_to'] ); ?>">
+											</label>
+										</div>
+										<p class="description hgp-md-filter__warn" x-show="dfrom && dto && dfrom > dto" x-cloak><?php esc_html_e( '開始日が終了日より後になっています。', 'distan' ); ?></p>
+										<p class="description"><?php esc_html_e( '両端を含みます。片方だけの指定も可（例: 開始だけ＝その日以降すべて）。固定ページの個別指定はこの日付の影響を受けません。', 'distan' ); ?></p>
+									</div>
+
+									<?php
+									$md_page_ids  = get_posts( array( 'post_type' => 'page', 'post_status' => 'publish', 'posts_per_page' => -1, 'orderby' => 'title', 'order' => 'ASC', 'fields' => 'ids' ) );
+									$md_page_list = array();
+									foreach ( (array) $md_page_ids as $md_pid ) {
+										$md_page_list[] = array( 'id' => (int) $md_pid, 'label' => html_entity_decode( get_the_title( (int) $md_pid ), ENT_QUOTES ) . ' (#' . (int) $md_pid . ')' );
+									}
+									$md_picked = array_values( array_unique( array_map( 'intval', (array) $settings['md_pages'] ) ) );
+									?>
+									<?php if ( ! empty( $md_page_list ) ) : ?>
+										<div class="hgp-md-filter__group" x-data='{ q: "", picks: <?php echo esc_attr( (string) wp_json_encode( $md_picked ) ); ?>, pages: <?php echo esc_attr( (string) wp_json_encode( $md_page_list ) ); ?>, candidates() { const s = this.q.trim().toLowerCase(); return this.pages.filter( p => ! this.picks.includes( p.id ) && ( s === "" || p.label.toLowerCase().includes( s ) ) ); }, add( v ) { const id = parseInt( v, 10 ); if ( id && ! this.picks.includes( id ) ) { this.picks = [ ...this.picks, id ]; } }, remove( id ) { this.picks = this.picks.filter( x => x !== id ); }, labelFor( id ) { const p = this.pages.find( p => p.id === id ); return p ? p.label : ( "#" + id ); } }'>
+											<div class="hgp-md-filter__head">
+												<div class="hgp-md-filter__legend"><?php esc_html_e( '固定ページを個別に含める', 'distan' ); ?></div>
+												<button type="button" class="hgp-md-filter__reset" @click="picks = []; q = ''"><?php esc_html_e( 'リセット', 'distan' ); ?></button>
+											</div>
+											<p class="description"><?php esc_html_e( 'ここで選んだ固定ページは、投稿タイプ・公開日の絞り込みに関係なく必ず content.md に入ります。絞り込み中に特定の固定ページだけ含めたいときに使います（トップやアーカイブは対象外）。', 'distan' ); ?></p>
+											<p class="hgp-template__row">
+												<label class="screen-reader-text" for="distan-md-page-filter"><?php esc_html_e( 'タイトルで絞り込み', 'distan' ); ?></label>
+												<input type="search" id="distan-md-page-filter" class="hgp-template__filter" x-model="q" placeholder="<?php esc_attr_e( 'タイトルで絞り込み', 'distan' ); ?>" autocomplete="off">
+												<label class="screen-reader-text" for="distan-md-page-select"><?php esc_html_e( '追加する固定ページ', 'distan' ); ?></label>
+												<select id="distan-md-page-select" x-ref="pageSel">
+													<template x-for="p in candidates()" :key="p.id">
+														<option :value="p.id" x-text="p.label"></option>
+													</template>
+												</select>
+												<button type="button" class="button" @click="add( $refs.pageSel.value )" :disabled="candidates().length === 0"><?php esc_html_e( '追加', 'distan' ); ?></button>
+											</p>
+											<p class="hgp-md-filter__count"><span x-show="q.trim() !== ''" x-cloak><span x-text="candidates().length"></span><?php esc_html_e( ' 件が一致・', 'distan' ); ?></span><span x-text="picks.length"></span><?php esc_html_e( ' 件を選択中', 'distan' ); ?></p>
+											<div class="hgp-md-filter__chips" x-show="picks.length" x-cloak>
+												<template x-for="id in picks" :key="'chip-' + id">
+													<span class="hgp-md-filter__chip">
+														<span x-text="labelFor( id )"></span>
+														<button type="button" class="hgp-md-filter__chip-x" @click="remove( id )" :aria-label="'削除: ' + labelFor( id )">&times;</button>
+													</span>
+												</template>
+											</div>
+											<template x-for="id in picks" :key="'md-pick-' + id">
+												<input type="hidden" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[md_pages][]" :value="id">
+											</template>
+										</div>
+									<?php endif; ?>
+								</div>
+
 							</td>
 						</tr>
 						<tr id="set-sitemap">
@@ -1176,8 +1315,11 @@ class Distan_Admin {
 						<dt><a class="distan-help__jump" href="#set-clean-html" @click="open = false"><?php esc_html_e( 'WordPress の痕跡を除く', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( 'generator や絵文字などの余分な出力を全ページから省き、納品用に整えます（メタ情報のみ。ブロック用 CSS やプラグイン JS は対象外）。', 'distan' ); ?></dd>
 
+						<dt><a class="distan-help__jump" href="#set-strip-comments" @click="open = false"><?php esc_html_e( 'HTMLコメントを削除', 'distan' ); ?></a></dt>
+						<dd><?php esc_html_e( '納品HTMLからプラグインやテーマが残す <!-- ... --> を取り除きます。<script>・<style>・<textarea>・<pre> の中身と IE 条件付きコメントは残します。既定オフ。', 'distan' ); ?></dd>
+
 						<dt><a class="distan-help__jump" href="#set-markdown" @click="open = false"><?php esc_html_e( 'Markdown を書き出す', 'distan' ); ?></a></dt>
-						<dd><?php esc_html_e( '全ページの本文を content.md にまとめます。AI ツールにサイト内容を読ませる用途です。', 'distan' ); ?></dd>
+						<dd><?php esc_html_e( '全ページの本文を content.md にまとめます。AI ツールにサイト内容を読ませる用途です。投稿タイプ・公開日で対象を絞ったり、固定ページを個別に含めることもできます。', 'distan' ); ?></dd>
 
 						<dt><a class="distan-help__jump" href="#set-sitemap" @click="open = false"><?php esc_html_e( 'サイトマップ / robots.txt', 'distan' ); ?></a></dt>
 						<dd><?php esc_html_e( '必要なら sitemap.xml と robots.txt を書き出します。', 'distan' ); ?></dd>

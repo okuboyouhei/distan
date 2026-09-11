@@ -49,6 +49,83 @@ final class Distan_Markdown {
 	}
 
 	/**
+	 * Whether a queue item should be transcribed into the Markdown export.
+	 *
+	 * The static site is always generated in full; this gate narrows only
+	 * content.md, so a site can be delivered whole while the AI-readable
+	 * transcript is limited to (for example) articles within a date window.
+	 *
+	 * Two tracks, both opt-in and both a human declaration:
+	 *   - Post types + publish-date range: bulk selection over article-like
+	 *     types. An empty type list means every type except 'page'.
+	 *   - Hand-picked pages: individual page IDs, always included and never
+	 *     subject to the date filter — an explicit pick is a declaration.
+	 *
+	 * Items with no post type (front page, term archives, the 404 shell) are
+	 * never transcribed: they are navigation, not content.
+	 *
+	 * @param array<string, mixed> $item The queue item (kind, id, post_type, url).
+	 * @return bool
+	 */
+	public static function wants( array $item ): bool {
+		$settings = Distan::settings();
+
+		// Provenance (kind / id / post_type) lives under 'source', not at the
+		// top level of the queue item.
+		$source    = ( isset( $item['source'] ) && is_array( $item['source'] ) ) ? $item['source'] : array();
+		$id        = isset( $source['id'] ) ? (int) $source['id'] : 0;
+		$post_type = isset( $source['post_type'] ) ? (string) $source['post_type'] : '';
+
+		$pages = array_map( 'intval', (array) ( $settings['md_pages'] ?? array() ) );
+		$types = array_values( array_filter( array_map( 'strval', (array) ( $settings['md_post_types'] ?? array() ) ) ) );
+		$from  = (string) ( $settings['md_date_from'] ?? '' );
+		$to    = (string) ( $settings['md_date_to'] ?? '' );
+
+		// Hand-picked pages are always in, whatever the filters — an explicit
+		// pick is a declaration that overrides everything below.
+		if ( $id && $pages && in_array( $id, $pages, true ) ) {
+			return true;
+		}
+
+		// No filter set at all → the export includes every page, exactly like
+		// before this feature existed: posts, custom types, fixed pages, the
+		// front page and archives. Narrowing is entirely opt-in.
+		$filtering = ( ! empty( $types ) || '' !== $from || '' !== $to );
+		if ( ! $filtering ) {
+			return true;
+		}
+
+		// Narrowing is active. Items with no post type (front page, term
+		// archives) drop out, and fixed pages come in only through the
+		// hand-pick list above — a date/type filter is about article-like
+		// content, and a page is kept by naming it, not by a bulk rule.
+		if ( '' === $post_type || 'page' === $post_type ) {
+			return false;
+		}
+
+		// Post-type filter (empty = every non-page type).
+		if ( $types && ! in_array( $post_type, $types, true ) ) {
+			return false;
+		}
+
+		// Publish-date window, inclusive on both ends. Compared as calendar
+		// days in the site's timezone, so it matches what an editor sees.
+		if ( ( '' !== $from || '' !== $to ) && $id ) {
+			$date = (string) get_post_time( 'Y-m-d', false, $id );
+			if ( '' !== $date ) {
+				if ( '' !== $from && $date < $from ) {
+					return false;
+				}
+				if ( '' !== $to && $date > $to ) {
+					return false;
+				}
+			}
+		}
+
+		return true;
+	}
+
+	/**
 	 * Extract one page into a Markdown section.
 	 *
 	 * @param string $html The raw page HTML (pre-rewrite is fine; only text is used).

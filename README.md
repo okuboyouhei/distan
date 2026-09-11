@@ -6,6 +6,13 @@ Distan（ディスタン）は、WordPress を制作環境として使い、そ�
 
 > **English:** Distan turns WordPress into a build environment for static HTML deliverables. You author in WordPress, then export clean, self-contained HTML that runs anywhere — no WordPress, no PHP, no database on the production server. Built for agencies that hand over HTML files rather than a CMS.
 
+[![WordPress.org プラグイン](https://img.shields.io/wordpress/plugin/v/distan?label=WordPress.org&color=21759b)](https://ja.wordpress.org/plugins/distan/)
+
+**公式配布ページ（WordPress.org）: https://ja.wordpress.org/plugins/distan/**
+Distan は WordPress.org 公式プラグインディレクトリで配布されています。このリポジトリはその**開発元（大久保陽平）による公式ソースコード**です。インストールは WordPress 管理画面の「プラグイン → 新規追加」で「Distan」を検索するか、上記の公式ページから取得してください。
+
+_Official plugin page: https://ja.wordpress.org/plugins/distan/ — This repository is the canonical, official source for the Distan WordPress plugin, published by its developer (Yohei Okubo) on the WordPress.org plugin directory._
+
 ## ヘッドロス CMS
 
 Distan の考え方を一言でいえば「ヘッドロス CMS」です。本番へ送るのは、静的 HTML という“頭”だけ。胴体（WordPress）は手元の工房に残します。動く WordPress を本番に置き続けないので、更新・脆弱性対応・環境依存といった保守の重さが、納品物から切り離されます。
@@ -144,6 +151,7 @@ Distan は、これを WordPress で解決します。`get_header()` と `get_te
 | 内部リンクの書き方 | **ドキュメント相対**（納品用）または **公開 URL で絶対**（バックアップ用） |
 | 検索エンジンの扱い | noindex を除去（本番納品）または残す（テスト環境での確認） |
 | WordPress の痕跡を除く | 納品用に HTML を整える |
+| HTML コメントを削除 | 納品 HTML から `<!-- ... -->` を取り除く（既定オフ） |
 
 ---
 
@@ -172,6 +180,8 @@ dist/
 `generator` / RSD / WLW / 隣接投稿の rel リンク / REST API の link タグと Link ヘッダー / oEmbed / フィードの link タグ / ショートリンク / 絵文字スクリプト / リソースヒント / X-Pingback / 投機的読み込み / `sourceURL` コメント / 開発環境の `noindex`
 
 ブロックのインライン CSS（`wp-block-*`）と `global-styles` は、レイアウトを支えているため既定では**残します**。ブロックを使わず、CSS を自分で書いている場合は、`distan_dequeue_handles` で `wp-block-library` を、`distan_remove_global_styles` で `global-styles` を落とせます。特定のページだけ落としたい場合は、そのページのテンプレートに `<!-- distan:no-block-styles -->` マーカーを書いておけば、[そのページの出力からだけ除去できます](#不要なアセットをページから外すマーカー)（通常生成・テンプレート書き出しの両方で効きます）。
+
+**HTML コメントの削除（任意）**。設定「HTML コメントを削除」を有効にすると、プラグインやテーマが残す `<!-- ... -->` を納品 HTML から取り除きます（既定オフ）。マーカーを解釈し終えた後・書き出し直前に適用するので、`distan:` マーカーとは競合しません。`<script>` / `<style>` / `<textarea>` / `<pre>` の中身は保護し、IE 条件付きコメント（`<!--[if ...]>`）は中に実マークアップを含みうるため残します。
 
 ---
 
@@ -283,6 +293,14 @@ add_filter( 'distan_markdown_region', function ( $html ) {
     return preg_replace( '#<div class="ad-banner">.*?</div>#is', '', $html );
 } );
 ```
+
+### 対象を絞り込む（投稿タイプ・公開日・個別ページ）
+
+`content.md` に含める範囲は絞り込めます。**何も指定しなければ、これまでどおり全ページ**（投稿・カスタム投稿・固定ページ・トップ・アーカイブ）が `content.md` に入ります。絞り込みは**任意**で、設定したときだけ効きます。**静的サイト（`dist/`）はどの設定でも全ページ生成**され、絞り込みは `content.md` の中身だけに効きます。たとえば「サイトは丸ごと納品しつつ、AI に読ませるのは記事だけ」といった使い分けができます。
+
+- **投稿タイプ** — チェックボックスで選びます。チェックしたタイプだけが対象になります（未チェックなら投稿タイプでは絞り込みません）。投稿タイプで絞り込むと、固定ページやトップ・アーカイブは外れます（固定ページを含めたいときは下の個別指定で戻します）。
+- **公開日（min〜max）** — 開始日・終了日で範囲を指定します。両端を含み、片方だけの指定もできます（例：開始日だけ指定すればその日以降すべて）。判定はサイトのタイムゾーンでの暦日です。日付で絞り込むと、公開日を持たないトップ・アーカイブは外れます。
+- **固定ページの個別指定** — タイトルで検索するとセレクトの候補が絞られて該当ページが選択状態になり、「追加」を押すと選んだページがチップとして積まれます（テンプレート書き出しと同じ操作感。複数選べ、チップの × で解除）。ここで選んだページは**投稿タイプ・公開日の絞り込みに関係なく必ず含まれます**（絞り込み中に特定の固定ページだけ残したいときに使います）。トップページやカテゴリーなどのアーカイブは `content.md` には出力されません。
 
 ## サイトマップと robots.txt
 

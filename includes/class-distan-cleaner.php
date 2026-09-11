@@ -345,4 +345,62 @@ class Distan_Cleaner {
 		 */
 		return (string) apply_filters( 'distan_clean_html', $html );
 	}
+
+	/**
+	 * Remove plain HTML comments from a finished page (opt-in).
+	 *
+	 * Applied at write time, after Distan_Report::apply_page_markers has
+	 * consumed and removed the distan: markers, so this never races them.
+	 * Comment-like text inside <script>, <style>, <textarea> and <pre> is
+	 * shielded first; IE conditional comments (<!--[if ...]> ... <![endif]-->)
+	 * are kept, because they can wrap real markup and dropping the wrapper
+	 * would silently drop content. Any PCRE failure returns the input
+	 * unchanged rather than risk blanking the page.
+	 *
+	 * @param string $html Finished HTML.
+	 * @return string
+	 */
+	public static function strip_comments( string $html ): string {
+		$store = array();
+
+		// 1) Shield regions where a comment-like run is content, not a comment.
+		$protected = preg_replace_callback(
+			'~<(script|style|textarea|pre)\b[^>]*>.*?</\1>~is',
+			static function ( $m ) use ( &$store ) {
+				$store[] = $m[0];
+				return "\x00DCMT" . ( count( $store ) - 1 ) . "\x00";
+			},
+			$html
+		);
+		if ( null === $protected ) {
+			return $html;
+		}
+
+		// 2) Drop plain comments; keep conditional (<!--[if ...) ones intact.
+		$cleaned = preg_replace_callback(
+			'~<!--(.*?)-->~s',
+			static function ( $m ) {
+				return 0 === strpos( ltrim( $m[1] ), '[if' ) ? $m[0] : '';
+			},
+			$protected
+		);
+		if ( null === $cleaned ) {
+			return $html;
+		}
+
+		// 3) Restore the shielded regions.
+		$restored = preg_replace_callback(
+			'~\x00DCMT(\d+)\x00~',
+			static function ( $m ) use ( $store ) {
+				$idx = (int) $m[1];
+				return isset( $store[ $idx ] ) ? $store[ $idx ] : '';
+			},
+			$cleaned
+		);
+		if ( null === $restored ) {
+			return $html;
+		}
+
+		return $restored;
+	}
 }

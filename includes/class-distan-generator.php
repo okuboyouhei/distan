@@ -311,6 +311,10 @@ class Distan_Generator {
 		// left in place — only this page stops referencing them.
 		$out_html = Distan_Report::apply_page_markers( $rewritten['html'], $item['path'] );
 
+		if ( ! empty( Distan::settings()['strip_comments'] ) ) {
+			$out_html = Distan_Cleaner::strip_comments( $out_html );
+		}
+
 		if ( ! Distan_Paths::write( $item['path'], $out_html ) ) {
 			return array(
 				'error' => sprintf(
@@ -333,7 +337,7 @@ class Distan_Generator {
 			|| false !== stripos( $out_html, "type='importmap'" );
 
 		$section = null;
-		if ( ! $is_404 && Distan_Markdown::is_enabled() ) {
+		if ( ! $is_404 && Distan_Markdown::is_enabled() && Distan_Markdown::wants( $item ) ) {
 			$section = Distan_Markdown::extract( $html, $item );
 		}
 
