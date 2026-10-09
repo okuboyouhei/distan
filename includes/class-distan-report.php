@@ -111,6 +111,8 @@ class Distan_Report {
 		$lines[] = '| 大きいファイル | ' . count( $large ) . ' |';
 		$lines[] = '';
 
+		$lines = array_merge( $lines, self::schema_section( (array) ( $manifest['schema_audit'] ?? array() ) ) );
+
 		// A production-correctness issue: development-domain URLs left in the
 		// output (typically in JSON-LD or canonical/OGP when the Production URL
 		// is unset). Surfaced near the top when present.
@@ -215,6 +217,45 @@ class Distan_Report {
 		$lines[] = '_Distan ' . DISTAN_VERSION . ' が生成しました。_';
 
 		return implode( "\n", $lines ) . "\n";
+	}
+
+
+	/** Render only recorded facts; no WordPress settings or post lookups. */
+	private static function schema_section( array $audit ): array {
+		if ( ! isset( $audit['pages'] ) ) {
+			return array( '## 構造化データの診断', '', '診断記録がありません。再生成すると記録されます。', '' );
+		}
+		$lines = array( '## 構造化データの診断', '', '生成したHTMLのJSON-LDを検査した記録です。既存データは自動修正していません。', '', '| 結果 | ページ数 |', '| --- | ---: |' );
+		foreach ( $audit['counts'] as $status => $count ) {
+			$lines[] = '| ' . self::schema_cell( Distan_Schema_Audit::status_label( $status ) ) . ' | ' . (int) $count . ' |';
+		}
+		$lines[] = '';
+		$lines[] = '- エラー・警告のあるページ: ' . (int) $audit['warning_pages'];
+		$lines[] = '- 未検査・一部未検査のページ: ' . (int) $audit['incomplete_pages'];
+		$lines[] = '';
+		$lines[] = '| 出力ページ | 追加・保持の結果 | JSON-LD数 | 検出した型 | 確認事項 |';
+		$lines[] = '| --- | --- | ---: | --- | --- |';
+		foreach ( $audit['pages'] as $path => $row ) {
+			$issues = array();
+			foreach ( $row['issues'] as $issue ) {
+				$level = array( 'error' => 'エラー', 'warning' => '要確認', 'info' => '参考' )[ $issue['level'] ] ?? '要確認';
+				$issues[] = $level . ( $issue['block'] ? ' #' . $issue['block'] : '' ) . ' [' . $issue['code'] . '] ' . Distan_Schema_Audit::issue_text( $issue['code'] ) . ( ! empty( $issue['detail'] ) ? ' (' . $issue['detail'] . ')' : '' );
+			}
+			$lines[] = '| ' . self::schema_cell( (string) $path ) . ' | ' . self::schema_cell( Distan_Schema_Audit::status_label( $row['status'] ) ) . ' | ' . ( null === $row['blocks'] ? '—' : (int) $row['blocks'] ) . ' | ' . self::schema_cell( implode( ', ', $row['types'] ) ) . ' | ' . self::schema_cell( implode( ' / ', $issues ) ) . ' |';
+		}
+		$lines[] = '';
+		$lines[] = '#はHTML内のJSON-LDブロック番号です。確認事項なしは「完全に正しい」という判定ではありません。';
+		$lines[] = '対象は基本的な構文、開発URL、ページ型のURLとcanonical、同一ページ内の@id定義です。/index.htmlと末尾/は同等として比較します。';
+		$lines[] = 'Schema.org全語彙、本文との意味の一致、Googleの表示要件、Microdata・RDFa、外部contextの展開は検査していません。';
+		$lines[] = '解析上限: ページあたり100ブロック・2000値、1ブロック256 KiB・JSON深さ64、走査深さ32、確認事項40件。超過は一部未検査として記録します。';
+		$lines[] = '[Schema.org Validator](https://validator.schema.org/) / [リッチリザルト テスト](https://search.google.com/test/rich-results) でも確認してください。';
+		$lines[] = '';
+		return $lines;
+	}
+
+	/** Prevent file paths and author-controlled types from breaking Markdown/HTML. */
+	private static function schema_cell( string $text ): string {
+		return str_replace( array( '|', '`', "\r", "\n" ), array( '&#124;', '&#96;', ' ', ' ' ), htmlspecialchars( $text, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8' ) );
 	}
 
 	/**
@@ -474,6 +515,13 @@ class Distan_Report {
 				$lines[] = '- ' . self::describe( (string) $path, $entries );
 			}
 			$lines[] = '';
+		}
+
+		if ( isset( $manifest['schema_audit']['pages'] ) ) {
+			$subset = array_intersect_key( $manifest['schema_audit']['pages'], array_fill_keys( $upload_paths, true ) );
+			$lines[] = '以下は今回の差分ZIPに含まれるページの診断です。全ページは全体レポートを確認してください。';
+			$lines[] = '';
+			$lines = array_merge( $lines, self::schema_section( Distan_Schema_Audit::summarize( $subset ) ) );
 		}
 
 		$lines[] = '---';
@@ -1088,7 +1136,7 @@ class Distan_Report {
 		$lines[] = '## 作業のしかた';
 		$lines[] = '';
 		$lines[] = '1. ZIPを解凍し、`' . $page . '` をブラウザで開いて表示を確認してください。';
-		$lines[] = '2. `<head>`・ヘッダー・フッターは変更しないでください。ここが本番とバイト単位で一致していることが、サイトに載せたときに見た目が揃う条件です。';
+		$lines[] = '2. 共通CSS・JSの読み込み、ヘッダー・フッターの構造は維持してください。`<title>`・説明・canonical・OGP・JSON-LDなどのページ固有情報は、新しいページの内容と公開URLに合わせて更新してください。';
 		$lines[] = '3. 本文（`<main>` などのコンテンツ領域）だけを、特設ページの内容に差し替えてください。';
 		$lines[] = '4. 新しく使う画像・CSS・JSは分かりやすいフォルダ（例: `assets/special/`）にまとめ、相対パスで参照してください。';
 		$lines[] = '5. 完成したHTML一式（追加したアセットを含む）を納品してください。';
@@ -1103,6 +1151,12 @@ class Distan_Report {
 		}
 		$lines[] = '- 文字コードは UTF-8 です。';
 		$lines[] = '';
+		if ( isset( $manifest['schema_audit']['pages'][ $page ] ) ) {
+			$lines[] = '以下は元ページを生成した時点の診断です。別ページへ転用した後は再検証してください。';
+			$lines[] = '';
+			$lines = array_merge( $lines, self::schema_section( Distan_Schema_Audit::summarize( array( $page => $manifest['schema_audit']['pages'][ $page ] ) ) ) );
+		}
+
 		$lines[] = '## 同梱アセット';
 		$lines[] = '';
 		if ( ! empty( $assets ) ) {

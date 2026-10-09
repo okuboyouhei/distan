@@ -80,6 +80,8 @@ class Distan_Ajax {
 
 		if ( ! empty( $state['done'] ) ) {
 			$state['manifest'] = Distan_Generator::manifest();
+			$state['manifest']['schema_diagnostics'] = Distan_Schema_Audit::for_display( (array) ( $state['manifest']['schema_audit'] ?? array() ) );
+			unset( $state['manifest']['schema_audit'] );
 		}
 
 		wp_send_json_success( $state );

@@ -60,6 +60,8 @@ consumer 側の機能を足すときの試金石は 2 つ。「これは工房�
 | `Distan_Urls` | URL 変換・パス平坦化・クエリ保持。**変換レイヤーの本体** |
 | `Distan_Collector` | 生成対象の列挙（`distan_sources` の合流とパス重複排除を含む） |
 | `Distan_Generator` | 生成・アセットコピー・掃除・リンク監査・マニフェスト |
+| `Distan_Schema_Audit` | 完成HTMLの読み取り専用診断・集計・表示用データ（設定の直接参照なし） |
+| `Distan_Schema` | 任意の基本 WebPage JSON-LD追加（生成器専用、既存JSON-LD優先） |
 | `Distan_Sitemap_Audit` | コア sitemap の読み取りと突き合わせ（HTTP なし）。カバレッジ診断と、選択制の列挙シード |
 | `Distan_Report` | 差分 Markdown と ZIP |
 | `Distan_Markdown` | AI ツール向けの本文抽出と `content.md` 生成（選択制） |
@@ -113,7 +115,21 @@ wp-content/uploads/2026/07/x            →  media/2026/07/x
 
 ## 構造化データ（JSON-LD）の扱い
 
-Distan は構造化データを**生成しません**。テーマや SEO プラグイン（Yoast、AIOSEO など）が出力した JSON-LD を、`protect_absolute_tags()` で保護しつつ静的化時に保持し、内部の URL を本番 URL に置換して運ぶだけです。生成の責任（型の選択、コンテンツとの整合、SSRF 相当のリスク）を負わないのは意図的な設計判断です。非公開・別ドメインの制作環境でも、**置換を前提にする**ことで本番向けの正しい構造化データを書き出せます。
+管理画面の「構造化データ（schema.org）」をオンにすると、既存の JSON-LD がないページに基本の `WebPage` JSON-LD を追加します（既定オフ）。公開URLと実際の出力ファイルパスから `url` を作り、HTML にあるタイトル・説明・言語だけを付けます。公開URL未設定・404・head のない HTML は追加対象外です。テーマや SEO プラグイン、手書きの JSON-LD は空・不正な JSON も含めて優先し、Distan で上書きや補完をしません。既存の URL 置換処理は従来どおりです。
+
+除外欄はディレクトリ用と個別ページ用に分かれています。WordPress のサイトURLを基準に `/private/` や `/contact/thanks/` のようなパスを1行ずつ指定します。ディレクトリは自身と配下全体、ページはそのパスだけに一致します。末尾のスラッシュは区別せず、日本語はそのままでもパーセント表記でも指定できます。クエリ違いのページにも同じ除外が適用されます。除外は自動追加だけを止め、ページ生成や既存 JSON-LD の保持には影響しません。設定変更後は再生成してください。
+
+`Distan_Schema::inject()` は generator の URL変換・マーカー・コメント処理後、ファイル保存とハッシュ計算の前にだけ呼びます。通常のWordPress表示にはフックしません。HTMLはDOMで検査し、再シリアライズせずhead先頭にJSON-LDだけを挿入します。JSON_HEX_*でメタ情報のscript脱出を防ぎます。既存JSON-LDのURL変換は従来どおり `Distan_Urls` が担当します。DOMが使えない場合は入力を維持します。型をコンテンツから推測しない方針は維持します。
+
+### 診断（1.9.0）
+
+`inject()` の第3引数は追加・見送り理由の参照出力。`render_one()` は保存したHTMLと同じバイト列を `Distan_Schema_Audit::inspect()` に渡す。成功は診断、失敗は未検査としてjob.schema_pagesへ蓄積し、manifest.schema_auditに件数とページ別結果を保存する。診断は追加オフでも走る。既存ブロックがあるときは「既存保持」が表示上の優先結果。HTMLは変更しない。
+
+診断クラスは環境情報を引数で受け取る。consumerはmanifestだけを読む。管理画面初期表示とAJAX完了時は同じ `for_display()` を通し、確認事項優先・最大200件で表示。全ページの結果はレポート。旧manifestは「診断記録なし」と扱い、合格扱いしない。差分とテンプレートのレポートは対象ページに絞った生成時点の記録。
+
+診断の範囲と上限はREADMEに記載。重複@idは無条件に誤りとしない。単なる参照は無視、複数の定義は参考、name/urlが異なる場合は要確認。型の自動推測、外部context取得、語彙の完全検証、Google適格性判定は行わない。参照仕様: https://www.w3.org/TR/json-ld11/ 。
+
+回帰テストは `php tests/schema-generator.php`（単体＋バッチ・manifest・全体/差分/テンプレートZIPまで）。WordPress APIは一部スタブ化しており、LocalでのPlugin Checkと画面確認は別途必要。
 
 ## 生成完了フック（`distan_after_generate`）
 
@@ -151,7 +167,7 @@ Distan は構造化データを**生成しません**。テーマや SEO プラ�
 
 ## リリース手順
 
-1. パッチバンプ（`distan.php` のヘッダと `DISTAN_VERSION` の**両方**）
+1. 変更内容に応じてバージョン更新（機能追加はマイナー、修正はパッチ）（`distan.php` のヘッダと `DISTAN_VERSION` の**両方**）
 2. プラグインフォルダ丸ごとを ZIP 化（ファイル名にバージョンを入れる）
 3. 動作確認（下記）
 4. `git push` して「`xxxx..yyyy  main -> main`」の行を目視確認

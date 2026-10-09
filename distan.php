@@ -3,7 +3,7 @@
  * Plugin Name: Distan
  * Plugin URI:  https://github.com/okuboyouhei/distan
  * Description: dist で開発する、WordPress静的サイトジェネレーター。HTML納品案件のために、WordPressを制作環境として使い、余計なものを含まない静的HTMLを書き出します。
- * Version:     1.8.0
+ * Version:     1.9.0
  * Author:      Youhei Okubo
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'DISTAN_VERSION', '1.8.0' );
+define( 'DISTAN_VERSION', '1.9.0' );
 define( 'DISTAN_FILE', __FILE__ );
 define( 'DISTAN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DISTAN_URL', plugin_dir_url( __FILE__ ) );
@@ -27,6 +27,8 @@ require_once DISTAN_DIR . 'includes/class-distan-cleaner.php';
 require_once DISTAN_DIR . 'includes/class-distan-urls.php';
 require_once DISTAN_DIR . 'includes/class-distan-collector.php';
 require_once DISTAN_DIR . 'includes/class-distan-generator.php';
+require_once DISTAN_DIR . 'includes/class-distan-schema.php';
+require_once DISTAN_DIR . 'includes/class-distan-schema-audit.php';
 require_once DISTAN_DIR . 'includes/class-distan-report.php';
 require_once DISTAN_DIR . 'includes/class-distan-markdown.php';
 require_once DISTAN_DIR . 'includes/class-distan-sitemap.php';
@@ -121,6 +123,9 @@ final class Distan {
 			'md_date_from'    => '',    // Markdown: only posts published on/after this date (YYYY-MM-DD). Empty = no lower bound.
 			'md_date_to'      => '',    // Markdown: only posts published on/before this date (YYYY-MM-DD). Empty = no upper bound.
 			'md_pages'        => array(), // Markdown: page IDs hand-picked to always include, ignoring the date filter.
+			'schema'               => false, // Supplement pages without existing JSON-LD.
+			'schema_exclude_dirs'  => '',    // Site-relative source directory paths, one per line.
+			'schema_exclude_pages' => '',    // Site-relative source page paths, one per line.
 			'sitemap'         => false, // Write a standards-compliant sitemap.xml from the generated pages.
 			'sitemap_exclude' => '',    // Newline-separated slug prefixes (/private/) or substrings (draft) to exclude.
 			'robots'          => false, // Write a minimal robots.txt (Allow: /, plus Sitemap: when sitemap is on).

@@ -1310,3 +1310,7 @@ html {
 	min-width: 240px;
 	max-width: 100%;
 }
+
+/* Schema diagnostics: contained scrolling for long delivery reports. */
+.distan-wrap .hgp-schema-scroll { max-height: 420px; overflow: auto; margin-top: var(--sp-sm); }
+.distan-wrap .hgp-schema-scroll td { vertical-align: top; overflow-wrap: anywhere; }

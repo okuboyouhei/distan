@@ -1,79 +1,51 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 420" font-family="'Hiragino Kaku Gothic ProN','Hiragino Sans','Noto Sans JP','Noto Sans CJK JP','Yu Gothic',sans-serif">
-  <rect x="0" y="0" width="1200" height="420" fill="#FFFFFF"/>
-  <rect x="14" y="14" width="1172" height="392" rx="16" fill="none" stroke="#E0E0E0" stroke-width="1.5"/>
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="760" viewBox="0 0 1200 760" role="img" aria-labelledby="title desc">
+<title id="title">WordPressをビルドツールとして使い、静的HTMLで納品する。</title>
+<desc id="desc">本番でWordPressを運用する構成と、DistanのヘッドロスCMSを同じ項目で比較。前者は本番のWordPressで編集し、公開先でPHPとデータベースを稼働させる。Distanでは制作側のWordPressで編集し、再生成と確認を経て静的ファイルを公開する。確認レポートと任意のMarkdown書き出しは公開とは別用途。</desc>
+<g font-family="'Hiragino Sans','Noto Sans JP','Yu Gothic',sans-serif" fill="#24332f">
+<rect width="1200" height="760" rx="16" fill="#f7f5ef"/>
+<rect x="24" y="24" width="1152" height="712" rx="12" fill="none" stroke="#d9d6cc"/>
 
-  <!-- ================= LEFT : 従来 / HEAD FULL ================= -->
-  <g>
-    <rect x="72" y="44" width="472" height="332" rx="14" fill="#FFFFFF" stroke="#DADADA" stroke-width="1.5"/>
-    <!-- row1: title band -->
-    <text x="96" y="82" font-size="13" letter-spacing="2" fill="#8A8A8A" font-weight="700">従来 — HEAD FULL</text>
-    <text x="96" y="112" font-size="21" font-weight="700" fill="#111111">WordPress ごと本番に置く</text>
-    <line x1="96" y1="128" x2="520" y2="128" stroke="#EDEDED" stroke-width="1"/>
-    <!-- row2: diagram zone (server stack), fixed band y=148..286 -->
-    <rect x="96" y="148" width="424" height="138" rx="10" fill="#F7F7F7" stroke="#DADADA" stroke-width="1.5"/>
-    <text x="308" y="172" font-size="12" fill="#8A8A8A" text-anchor="middle" letter-spacing="1">クライアントのサーバー</text>
-    <rect x="120" y="186" width="376" height="28" rx="6" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
-    <text x="308" y="205" font-size="13" fill="#333333" text-anchor="middle">管理画面・ログイン</text>
-    <rect x="120" y="220" width="376" height="28" rx="6" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
-    <text x="308" y="239" font-size="13" fill="#333333" text-anchor="middle">データベース</text>
-    <rect x="120" y="254" width="376" height="28" rx="6" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
-    <text x="308" y="273" font-size="13" fill="#333333" text-anchor="middle">プラグイン</text>
-    <!-- row3: tag row, fixed band y=300..332 -->
-    <g font-size="13" font-weight="700">
-      <rect x="96" y="300" width="134" height="32" rx="16" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1.2"/>
-      <text x="163" y="321" fill="#111111" text-anchor="middle">！ 更新</text>
-      <rect x="241" y="300" width="150" height="32" rx="16" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1.2"/>
-      <text x="316" y="321" fill="#111111" text-anchor="middle">！ 脆弱性対応</text>
-      <rect x="402" y="300" width="118" height="32" rx="16" fill="#FFFFFF" stroke="#BDBDBD" stroke-width="1.2"/>
-      <text x="461" y="321" fill="#111111" text-anchor="middle">！ 環境依存</text>
-    </g>
-    <!-- row4: caption -->
-    <text x="96" y="360" font-size="13" fill="#6E6E6E">動く WordPress が残り、保守がずっと付いてくる。</text>
-  </g>
-
-  <!-- center arrow -->
-  <g>
-    <circle cx="600" cy="210" r="24" fill="#111111"/>
-    <path d="M591 210 h15 M600 202 l9 8 -9 8" fill="none" stroke="#FFFFFF" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
-  </g>
-
-  <!-- ================= RIGHT : ヘッドロス / HEAD LOSS ================= -->
-  <g>
-    <rect x="656" y="44" width="472" height="332" rx="14" fill="#FFFFFF" stroke="#111111" stroke-width="2"/>
-    <!-- row1: title band -->
-    <text x="680" y="82" font-size="13" letter-spacing="2" fill="#111111" font-weight="700">ヘッドロス — HEAD LOSS</text>
-    <text x="680" y="112" font-size="21" font-weight="700" fill="#111111">静的HTMLだけ本番に置く</text>
-    <line x1="680" y1="128" x2="1104" y2="128" stroke="#EDEDED" stroke-width="1"/>
-    <!-- row2: diagram zone (workshop -> distan -> server), same band y=148..286 -->
-    <rect x="680" y="148" width="196" height="138" rx="10" fill="#F7F7F7" stroke="#DADADA" stroke-width="1.5"/>
-    <text x="778" y="172" font-size="12" fill="#8A8A8A" text-anchor="middle" letter-spacing="1">手元の工房</text>
-    <rect x="700" y="186" width="156" height="40" rx="8" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
-    <text x="778" y="205" font-size="13" fill="#333333" text-anchor="middle" font-weight="700">WordPress</text>
-    <text x="778" y="220" font-size="10" fill="#8A8A8A" text-anchor="middle">作る場所（残す）</text>
-    <rect x="700" y="234" width="156" height="40" rx="8" fill="#111111"/>
-    <text x="778" y="253" font-size="13" fill="#FFFFFF" text-anchor="middle" font-weight="700">Distan</text>
-    <text x="778" y="268" font-size="10" fill="#C9C9C9" text-anchor="middle">書き出す</text>
-
-    <path d="M888 217 h16 M900 210 l8 7 -8 7" fill="none" stroke="#111111" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
-
-    <rect x="920" y="148" width="184" height="138" rx="10" fill="#F7F7F7" stroke="#111111" stroke-width="1.5"/>
-    <text x="1012" y="172" font-size="12" fill="#8A8A8A" text-anchor="middle" letter-spacing="1">クライアントのサーバー</text>
-    <rect x="940" y="186" width="144" height="26" rx="6" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
-    <text x="1012" y="204" font-size="12" fill="#333333" text-anchor="middle">index.html</text>
-    <rect x="940" y="218" width="144" height="26" rx="6" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
-    <text x="1012" y="236" font-size="12" fill="#333333" text-anchor="middle">about/ …</text>
-    <rect x="940" y="250" width="144" height="26" rx="6" fill="#FFFFFF" stroke="#CFCFCF" stroke-width="1"/>
-    <text x="1012" y="268" font-size="12" fill="#333333" text-anchor="middle">news/ …</text>
-    <!-- row3: tag row, same band y=300..332 -->
-    <g font-size="13" font-weight="700">
-      <rect x="680" y="300" width="134" height="32" rx="16" fill="#111111"/>
-      <text x="747" y="321" fill="#FFFFFF" text-anchor="middle">✓ PHP 不要</text>
-      <rect x="825" y="300" width="122" height="32" rx="16" fill="#111111"/>
-      <text x="886" y="321" fill="#FFFFFF" text-anchor="middle">✓ DB 不要</text>
-      <rect x="958" y="300" width="146" height="32" rx="16" fill="#111111"/>
-      <text x="1031" y="321" fill="#FFFFFF" text-anchor="middle">✓ どこにでも</text>
-    </g>
-    <!-- row4: caption -->
-    <text x="680" y="360" font-size="13" fill="#6E6E6E">頭（静的HTML）だけ送り、胴体（WordPress）は工房に。</text>
-  </g>
-</svg>
+<text x="56" y="62" font-size="13" fill="#346357" font-weight="700">Distan  /  CONCEPT</text>
+<text x="56" y="104" font-size="28" fill="#24332f" font-weight="700">WordPressをビルドツールとして使い、静的HTMLで納品する。</text>
+<text x="56" y="137" font-size="17" fill="#58635d" font-weight="400">国内のWeb制作で、静的HTML納品が求められる案件に。</text>
+<rect x="224" y="174" width="452" height="398" rx="8" fill="#faf9f5" stroke="#d9d6cc"/>
+<rect x="692" y="174" width="452" height="398" rx="8" fill="#ffffff" stroke="#9bac9e"/>
+<rect x="240" y="190" width="420" height="72" rx="8" fill="#eeece5" stroke="#eeece5"/>
+<rect x="708" y="190" width="420" height="72" rx="8" fill="#e8eee7" stroke="#e8eee7"/>
+<text x="260" y="217" font-size="20" fill="#24332f" font-weight="700">WordPressを本番で運用</text>
+<text x="260" y="245" font-size="15" fill="#58635d" font-weight="400">CMSを公開先で動かす構成</text>
+<text x="728" y="217" font-size="20" fill="#346357" font-weight="700">Distan / ヘッドロスCMS</text>
+<text x="728" y="245" font-size="15" fill="#58635d" font-weight="400">CMSを制作側のビルドツールにする構成</text>
+<text x="56" y="286" font-size="12" fill="#346357" font-weight="700">01</text>
+<text x="56" y="310" font-size="18" fill="#24332f" font-weight="700">制作・編集</text>
+<text x="56" y="368" font-size="12" fill="#346357" font-weight="700">02</text>
+<text x="56" y="392" font-size="18" fill="#24332f" font-weight="700">公開先</text>
+<text x="56" y="474" font-size="12" fill="#346357" font-weight="700">03</text>
+<text x="56" y="498" font-size="18" fill="#24332f" font-weight="700">更新方法</text>
+<path d="M240 340 H660 M708 340 H1128" stroke="#d9d6cc" fill="none"/>
+<path d="M240 450 H660 M708 450 H1128" stroke="#d9d6cc" fill="none"/>
+<text x="260" y="302" font-size="20" fill="#24332f" font-weight="700">本番のWordPressで編集</text>
+<text x="260" y="327" font-size="15" fill="#58635d" font-weight="400">管理画面・投稿・メディア</text>
+<text x="728" y="302" font-size="20" fill="#24332f" font-weight="700">制作側のWordPressで編集</text>
+<text x="728" y="327" font-size="15" fill="#58635d" font-weight="400">管理画面・投稿・メディア</text>
+<text x="260" y="379" font-size="23" fill="#24332f" font-weight="700">WordPress ＋ PHP ＋ DB</text>
+<text x="260" y="408" font-size="15" fill="#58635d" font-weight="400">リクエストごとにページを生成・配信</text>
+<text x="260" y="434" font-size="15" fill="#58635d" font-weight="400">公開先でCMSの更新・保守が必要</text>
+<text x="728" y="379" font-size="23" fill="#346357" font-weight="700">HTML・CSS・JS・画像</text>
+<text x="728" y="408" font-size="15" fill="#58635d" font-weight="400">生成済みの静的ファイルを配信</text>
+<text x="728" y="434" font-size="15" fill="#346357" font-weight="400">公開先はWordPress・PHP・DB不要</text>
+<text x="260" y="490" font-size="20" fill="#24332f" font-weight="700">編集 → 公開</text>
+<text x="260" y="519" font-size="15" fill="#58635d" font-weight="400">WordPressのデータを更新して反映</text>
+<text x="728" y="490" font-size="20" fill="#24332f" font-weight="700">編集 → 再生成 → 確認 → 納品</text>
+<text x="728" y="519" font-size="15" fill="#58635d" font-weight="400">全体 / 差分ZIPを既存の公開手順へ</text>
+<text x="260" y="550" font-size="14" fill="#58635d" font-weight="700">本番でCMSを運用する</text>
+<text x="728" y="550" font-size="14" fill="#346357" font-weight="700">CMSは制作側に残す</text>
+<text x="56" y="607" font-size="15" fill="#346357" font-weight="700">Distanの制作・確認用出力</text>
+<rect x="56" y="621" width="536" height="62" rx="8" fill="#eee9dc" stroke="#eee9dc"/>
+<rect x="608" y="621" width="536" height="62" rx="8" fill="#eee9dc" stroke="#eee9dc"/>
+<text x="74" y="646" font-size="16" fill="#24332f" font-weight="700">診断レポート</text>
+<text x="74" y="669" font-size="13" fill="#58635d" font-weight="400">リンク・URL・JSON-LDを確認。記録は公開用ファイルと分けて保持。</text>
+<text x="626" y="646" font-size="16" fill="#24332f" font-weight="700">AIツールで活用（任意）</text>
+<text x="626" y="669" font-size="13" fill="#58635d" font-weight="400">サイト本文を1つの content.md に集約。AIへの読み込み用。</text>
+<text x="56" y="712" font-size="13" fill="#626a65" font-weight="400">※ 左は本番運用の一例です。両構成とも環境の保守は必要です。Distanは公開先へのアップロードを行いません。</text>
+</g></svg>

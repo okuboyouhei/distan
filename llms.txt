@@ -16,8 +16,9 @@ Distan は公開中の全ページをループバック HTTP で巡回し、静�
 
 - 静的 HTML 書き出し（フロントページ／全シングル／アーカイブ＋ページネーション／404）
 - URL 変換（ドキュメント相対 or 本番 URL 絶対）と本番 URL への置換（`distan_url_replacements` で複数指定可）
-- 構造化データ（JSON-LD）の保持と URL 置換（生成はしない。SEO プラグインの出力を運ぶ）
+- 構造化データ（JSON-LD）の保持と URL 置換。schema 設定（既定オフ）で、既存 JSON-LD のない静的ページに基本 WebPage を追加。公開URLが必須。実出力パス・HTMLのタイトル/説明/言語を使用。404除外。schema_exclude_dirs（配下含む）/schema_exclude_pages（完全一致）にサイト相対の元パスを1行ずつ指定。既存JSON-LDは削除しない。
 - クリーン HTML（WordPress の痕跡除去、noindex 除去）
+- 構造化データ診断: 自動追加オフでもJSON-LDを読み取り検査。空/不正JSON、開発URL、ページ型URLとcanonical、同一ページ内@id定義を確認。参照だけの@idは警告しない。manifest.schema_auditを管理画面と各納品レポートで使用。解析上限・生成失敗は未検査として記録。語彙/意味/Google適格性の完全検証ではない。外部通信・自動修正なし。
 - HTMLコメント削除（strip_comments・既定オフ）: 納品HTMLからプレーンな`<!-- -->`を除去。apply_page_markers後・書き出し直前に適用（distan:マーカーと競合しない）。script/style/textarea/pre内は保護、IE条件付きコメント（<!--[if）は残す。PCRE失敗時は無変更で返す
 - パス平坦化（テーマ→assets/、uploads→media/）
 - キャッシュバスティングのクエリ保持（ファイル名不変で FTP 上書き可）
@@ -35,7 +36,7 @@ Distan は公開中の全ページをループバック HTTP で巡回し、静�
 - コアサイトマップ突き合わせ（wp-sitemap をプロセス内で読み、未生成 URL をレポートに一覧。distan_use_core_sitemap で補助ソースとして列挙にも合流可、既定オフ）
 - 差分エクスポート（変更分のみ）。前回生成からの追加・変更ファイルだけを ZIP 化（本番と同じ相対パスで解凍して上書き可）。削除対象は DELETE.txt、概要は distan-diff.md。変更検知はページ HTML の内容ハッシュ（パス不変でも中身変化を検出、アセットは追加/削除で追跡）。全体 ZIP は初回・節目用に残置。差分の基準は distan_manifest_source で db（既定・単一環境）/ output（成果物同梱の携行 manifest .distan/manifest.json、生成とデプロイが別環境のとき）を選択。既定 db で挙動は不変
 - 取りこぼしの取り込み。列挙は DB を読むのでプラグインが動的登録する URL（フォーム完了画面・仮想ルート）を知らない。コア sitemap 照合（sitemap_missing）やリンク切れ（broken）で存在は見えるが、生成に足すには従来 distan_sources を手書きする必要があった。生成画面で候補（コア sitemap にあって未生成の URL）を「含める／今後表示しない／未決」から URL ごとに選ぶ（Distan_Takeup、オプション distan_takeup、include/ignore の 2 リスト）。既定オプトインで選んだものだけが collect() で distan_sources と同経路（make_item→dedup、origin=takeup）でキュー投入。判断は記憶。ignore は include より優先で、書き出したくない URL は混ざらない。コア sitemap 外の URL は自由入力欄で追加（同一オリジンのみ）。検知は既存（missing_from / audit_links）、追加したのは取り込みアクション
-- テンプレート書き出し。生成済みページを 1 枚選ぶと、そのページ＋参照アセットのみ（CSS・JS・フォント・画像、url()・@import も再帰追従）を本番と同じ相対パスで ZIP 化（Distan_Report::build_template_zip）。共通ヘッダー・フッターに沿った特設ページ制作を外部委託する際の雛形。全ページ分の素材は同梱せず、ナビ遷移先ページは 1 枚納品では欠落する前提。ZIP ルートに制作者向け README.md 同梱（head/header/footer 不可侵・本文のみ差し替え・相対パス維持）。本文領域の切り出しはしない。生成画面の「テンプレート書き出し」設定（既定オン）で表示切替
+- テンプレート書き出し。生成済みページを 1 枚選ぶと、そのページ＋参照アセットのみ（CSS・JS・フォント・画像、url()・@import も再帰追従）を本番と同じ相対パスで ZIP 化（Distan_Report::build_template_zip）。共通ヘッダー・フッターに沿った特設ページ制作を外部委託する際の雛形。全ページ分の素材は同梱せず、ナビ遷移先ページは 1 枚納品では欠落する前提。ZIP ルートに制作者向け README.md 同梱（共通CSS/JS・header/footer・相対パスを維持。本文とページ固有のtitle/description/canonical/OGP/JSON-LDは転用先に合わせて更新）。本文領域の切り出しはしない。生成画面の「テンプレート書き出し」設定（既定オン）で表示切替
 - プラグイン一覧に「設定」リンク（plugin_action_links → admin.php?page=distan）
 - テンプレート候補のライブ絞り込み。全候補を Alpine x-data に JSON で渡し x-for で option をタイトル部分一致フィルタ。生成経路に非依存・フロント完結
   - テンプレートマーカー（通常生成・テンプレート書き出し両方で有効）: `<!-- distan:no-block-styles -->`＝ブロックCSS除去(wp-block-library/-theme link＋id が wp-block-*/global-styles* のインラインstyle全部＝library-inline/per-block/placeholder。wp-img-auto-sizesも対象)、`<!-- distan:drop-assets <prefix>... -->`＝出力相対パス前方一致でscript/style除去（plugin/coreは wp-content/plugins/・wp-includes/ のまま）。トップレベルlink/scriptのみ・残CSSのurl()は不干渉・タグごと除去・マーカーも除去・推定なし。通常生成でも apply_page_markers を書き出し前に適用（該当link/script＋inline除去、マーカーも除去）。共有ファイル実体は消さずページの参照タグだけ外す＝他ページ無傷
@@ -45,6 +46,6 @@ Distan は公開中の全ページをループバック HTTP で巡回し、静�
 ## できないこと
 
 - 本番での動的処理（フォーム・検索・コメント等）は動かない
-- 構造化データの生成はしない（保持と置換のみ）
+- 商品・評価・FAQ・組織などの構造化データは推測しない（任意の基本 WebPage 追加のみ）
 - リアルタイム更新はしない（外部データは生成時点で凍結、更新は再生成）
 - ES modules は file:// で動かない（クラシックテーマなら回避可能）

@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.8.0
+Stable tag: 1.9.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -14,15 +14,15 @@ Author in WordPress, deliver static HTML — built for handing over files, not a
 
 Distan turns WordPress into a build environment for static HTML deliverables. You author in WordPress, then export clean, self-contained HTML that runs anywhere. No WordPress, no PHP, and no database are required on the production server.
 
-Most static-export plugins mirror a *live* WordPress site and keep it running behind the scenes. Distan is built for the opposite case: the HTML files themselves are the deliverable, and WordPress stays on the developer's side and is never published. When an update is needed, you edit in WordPress, regenerate, and hand over the difference. (We think of it as "headloss": the head — the static HTML — goes to production, while the body — WordPress — stays in the workshop.)
+Distan is designed for projects where the agency maintains the source and hands over HTML files: recruitment sites, campaign pages, or a section of an existing corporate site where another WordPress installation is not an option. Edit in WordPress, regenerate, review the changes, and deliver the files through your existing publishing process.
 
-This suits people who deliver *files*, not a CMS — for example a recruitment site placed under a subdirectory of an existing corporate site, where adding another WordPress install is not an option.
+**Built around the handoff**
 
-**How Distan is different**
-
-* **It does not deploy for you, and holds no credentials.** Distan writes files and stops there. Deployment is wired through hooks (`distan_after_generate`, `distan_dispatch`), so you connect your own rsync, git push, FTP, or CI. Nothing to trust with your server keys.
-* **It enumerates, it does not crawl.** Distan generates the pages WordPress already knows about, rather than spidering links. The result is predictable and light — no queue, no database tables, no build daemon.
-* **It stays small.** No bundled framework, no vendor tree, no schema migrations. Easy to read, easy to audit, and nothing left behind when you remove it.
+* **Keep updates reviewable.** See added, changed and removed files, download a differential ZIP, and pass on a deletion list. Distan does not delete files on the production server.
+* **Inspect what you actually deliver.** Check generated links and development URLs, and review page-level JSON-LD diagnostics. Reports use the generation record, so changing settings later does not change the recorded findings for that build.
+* **Respect existing structured data.** Optional basic WebPage JSON-LD fills pages without existing JSON-LD. Theme, SEO-plugin and handwritten JSON-LD take precedence; diagnostics flag issues without repairing the data automatically.
+* **Make the next person's job easier.** Export one page with its referenced assets and editing instructions, or export selected content as Markdown for an AI-assisted workflow.
+* **Keep publishing under your control.** Download files or connect your deployment process through hooks. Distan does not store deployment credentials or require a Node.js build toolchain.
 
 **What it does**
 
@@ -42,11 +42,17 @@ This suits people who deliver *files*, not a CMS — for example a recruitment s
 
 **Requirements**
 
-The only hard requirement is loopback HTTP (the site being able to request itself). No direct SQL, no `exec()`, no external binaries, no external APIs. It runs on Local, MAMP, XAMPP, DDEV, Docker, or shared hosting, and works offline.
+Requires WordPress 6.0+, PHP 8.0+, writable uploads and working loopback HTTP (the site being able to request itself). ZIP downloads require ZipArchive. No direct SQL, no `exec()`, no external binaries, no external APIs. It runs on Local, MAMP, XAMPP, DDEV, Docker, or shared hosting, and works offline.
 
 **Not for every case**
 
 Distan is not suitable when the client updates the site themselves, or when forms, search, comments, or membership are required. If you need built-in deployment to many destinations, scheduled or change-based publishing, or managed static hosting, a larger tool such as Simply Static or Staatic will fit better.
+
+**Structured data: add only what is known, inspect what is delivered**
+
+Enable the schema.org option to add basic WebPage JSON-LD to exported pages without existing JSON-LD. Configure the production URL first. Directory and page exclusions use source paths relative to the WordPress home URL, one per line (for example /private/ and /contact/thanks/). Directory rules include descendants; page rules match only that path. Trailing slashes are ignored and query variants share the rule. Existing JSON-LD is retained even when excluded or disabled. Regenerate after changing settings.
+
+Every generated page is also checked for basic JSON-LD syntax and URL consistency, even when automatic additions are off. See the generation screen and delivery report for per-page outcomes, block numbers and issues. Existing data is never automatically repaired. Limited or failed inspection is explicitly recorded. Use Schema.org Validator and Google Rich Results Test for additional validation; this local audit does not guarantee search appearance.
 
 == Installation ==
 
@@ -60,7 +66,7 @@ The output is written to `wp-content/uploads/distan/dist/`.
 
 = Does the production server need WordPress? =
 
-No. The output is static HTML. That is the point: there is no application to attack or maintain on the production server.
+No. The output is static HTML. The delivered site does not require the WordPress application or its database. The production host and the separate WordPress authoring environment still need appropriate maintenance.
 
 = How do I deploy the result? =
 
@@ -100,6 +106,14 @@ Yes, with an explicit opt-in. Name the query keys that change the page with the 
 2. 「使い方」ヘルプ。Distan の考え方（WordPress は作る場所、書き出した HTML が納品物）と、環境の確認 → 書き出し → 受け取り・公開の流れ、主な設定の要点を確認できます。
 
 == Changelog ==
+
+= 1.9.0 =
+* Added: optional basic WebPage JSON-LD for pages without existing JSON-LD. Uses the production URL and actual output path, plus the title, description and language available in the HTML. Off by default; requires a production URL and skips 404 pages.
+* Added: separate directory and exact-page exclusions for automatic additions. Existing theme, SEO-plugin and handwritten JSON-LD takes precedence, including empty or malformed blocks; exclusion does not remove existing data.
+* Added: read-only diagnostics on generated HTML, even when automatic additions are off. Detects empty or malformed JSON, development URLs including escaped URLs, page-type URL/canonical mismatches, and repeated or conflicting same-page @id definitions. Reference-only @id nodes are not treated as duplicate definitions.
+* Added: per-page addition and inspection results in the admin and delivery reports, with relevant results in differential and template ZIPs. Generation records preserve the findings; failed or incomplete inspections are explicitly marked.
+* Improved: warns when automatic additions are enabled without a production URL. Template handoff instructions now explain which page-specific metadata must be updated when reusing a page.
+* Scope: basic local syntax and URL checks only. No automatic repair, external context fetching, complete Schema.org validation, or guarantee of rich results or AI-search visibility.
 
 = 1.8.0 =
 * Added: the Markdown export (content.md) can now be narrowed by post type and by publish date, and specific fixed pages can be force-included, so a site can be delivered whole while only, say, its articles within a date window are transcribed for an AI. With no filter set the export still covers every page as before (posts, custom types, fixed pages, the front page and archives). When you do filter, post types are chosen with checkboxes and the publish-date range is inclusive on both ends (either bound may be left open); while filtering, pages and archives drop out unless a page is added individually from the live title search, which force-includes it. The static HTML output (dist/) is unchanged by any of this.

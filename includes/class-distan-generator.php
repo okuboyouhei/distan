@@ -55,6 +55,7 @@ class Distan_Generator {
 			'total'       => count( $queue ),
 			'written'     => array(),
 			'hashes'      => array(),
+			'schema_pages' => array(),
 			'assets'      => array(),
 			'errors'      => array(),
 			'md_started'  => false,
@@ -137,6 +138,7 @@ class Distan_Generator {
 			$result = self::render_one( $item );
 
 			if ( isset( $result['error'] ) ) {
+				$job['schema_pages'][ $item['path'] ] = array( 'status' => 'failed', 'blocks' => null, 'types' => array(), 'issues' => array(), 'complete' => false );
 				$job['errors'][] = array(
 					'url'     => $item['url'],
 					'message' => $result['error'],
@@ -144,6 +146,7 @@ class Distan_Generator {
 				continue;
 			}
 
+			$job['schema_pages'][ $item['path'] ] = $result['schema_audit'];
 			$job['written'][] = $item['path'];
 			// Content hash of the bytes just written, for the next run's
 			// modified-file diff. Pages only; assets stay add/remove-tracked.
@@ -315,6 +318,9 @@ class Distan_Generator {
 			$out_html = Distan_Cleaner::strip_comments( $out_html );
 		}
 
+		// Supplement final HTML only; included in the content hash below.
+		$out_html = Distan_Schema::inject( $out_html, $item, $schema_reason );
+
 		if ( ! Distan_Paths::write( $item['path'], $out_html ) ) {
 			return array(
 				'error' => sprintf(
@@ -342,6 +348,7 @@ class Distan_Generator {
 		}
 
 		return array(
+			'schema_audit' => Distan_Schema_Audit::inspect( $out_html, $schema_reason, array( 'site' => home_url( '/' ), 'site_url' => (string) Distan::settings()['site_url'] ) ),
 			'assets'      => $rewritten['assets'],
 			'has_modules' => $has_modules,
 			'md_section'  => $section,
@@ -837,6 +844,7 @@ class Distan_Generator {
 
 		$data = array(
 			'version'  => 2,
+			'schema_audit' => Distan_Schema_Audit::summarize( $job['schema_pages'] ?? array() ),
 			'files'    => $current,
 			'hashes'   => $cur_hashes,
 			'entries'  => $entries,

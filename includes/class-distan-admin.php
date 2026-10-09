@@ -212,6 +212,7 @@ class Distan_Admin {
 		$finished = (int) ( $stored['finished'] ?? 0 );
 
 		return array(
+			'schema_diagnostics' => Distan_Schema_Audit::for_display( (array) ( $stored['schema_audit'] ?? array() ) ),
 			'files'          => array_values( (array) $stored['files'] ),
 			'added'          => array_values( (array) ( $stored['added'] ?? array() ) ),
 			'cleaned'        => array_values( (array) ( $stored['cleaned'] ?? array() ) ),
@@ -339,6 +340,11 @@ class Distan_Admin {
 		$md_pages_in     = isset( $input['md_pages'] ) ? (array) $input['md_pages'] : array();
 		$out['md_pages'] = array_values( array_unique( array_filter( array_map( 'intval', $md_pages_in ) ) ) );
 
+		$out['schema'] = ! empty( $input['schema'] );
+		foreach ( array( 'schema_exclude_dirs', 'schema_exclude_pages' ) as $key ) {
+			$out[ $key ] = isset( $input[ $key ] ) && is_string( $input[ $key ] )
+				? sanitize_textarea_field( $input[ $key ] ) : '';
+		}
 		$out['sitemap']         = ! empty( $input['sitemap'] );
 		$out['sitemap_exclude'] = isset( $input['sitemap_exclude'] )
 			? sanitize_textarea_field( (string) $input['sitemap_exclude'] )
@@ -880,6 +886,30 @@ class Distan_Admin {
 					</details>
 				</template>
 
+				<p class="hgp-hint" x-show="manifest &amp;&amp; (!manifest.schema_diagnostics || manifest.schema_diagnostics.total === undefined)" x-cloak><?php esc_html_e( '構造化データの診断記録がありません。再生成すると表示されます。', 'distan' ); ?></p>
+				<template x-if="manifest && manifest.schema_diagnostics && manifest.schema_diagnostics.total !== undefined">
+					<details class="hgp-details" :class="manifest.schema_diagnostics.warning_pages ? 'is-warn' : ''" open>
+						<summary><?php esc_html_e( '構造化データの診断', 'distan' ); ?><span class="hgp-count" x-text="manifest.schema_diagnostics.total"></span></summary>
+						<p class="hgp-hint"><?php esc_html_e( '生成したHTMLのJSON-LDを検査した結果です。設定変更は次回生成から反映されます。既存データは自動修正しません。', 'distan' ); ?></p>
+						<ul class="hgp-list">
+							<template x-for="count in manifest.schema_diagnostics.counts" :key="count.label"><li><span x-text="count.label"></span>：<strong x-text="count.count"></strong></li></template>
+						</ul>
+						<p class="hgp-hint"><?php esc_html_e( 'エラー・警告のあるページ：', 'distan' ); ?><strong x-text="manifest.schema_diagnostics.warning_pages"></strong> ／ <?php esc_html_e( '未検査・一部未検査：', 'distan' ); ?><strong x-text="manifest.schema_diagnostics.incomplete_pages"></strong></p>
+						<details><summary><?php esc_html_e( 'ページ別の結果を開く', 'distan' ); ?></summary>
+						<div class="hgp-schema-scroll">
+						<table class="hgp-table"><thead><tr><th><?php esc_html_e( '出力ページ', 'distan' ); ?></th><th><?php esc_html_e( '追加・保持の結果', 'distan' ); ?></th><th><?php esc_html_e( 'JSON-LDと確認事項', 'distan' ); ?></th></tr></thead><tbody>
+						<template x-for="row in manifest.schema_diagnostics.rows" :key="row.path"><tr>
+							<td><code x-text="row.path"></code></td><td x-text="row.status"></td><td>
+							<span x-text="row.blocks === null ? '—' : row.blocks"></span> <?php esc_html_e( '件', 'distan' ); ?> <span x-text="row.types"></span>
+							<template x-for="(message, index) in row.messages" :key="index"><p class="hgp-hint" x-text="message"></p></template>
+							</td></tr></template>
+						</tbody></table></div>
+						<p class="hgp-hint"><?php esc_html_e( '確認事項のあるページから最大200件を表示します。全ページの結果は生成レポートに記載しています。#はHTML内のJSON-LDブロック番号です。', 'distan' ); ?></p>
+						</details>
+						<p class="hgp-hint"><?php esc_html_e( 'この診断は基本的な構文・URL整合性の確認です。Schema.org全語彙、本文との意味の一致、Googleの表示要件は判定しません。Microdata・RDFa・外部contextの展開も対象外です。', 'distan' ); ?> <a href="https://validator.schema.org/" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'Schema.org Validator', 'distan' ); ?></a> / <a href="https://search.google.com/test/rich-results" target="_blank" rel="noopener noreferrer"><?php esc_html_e( 'リッチリザルト テスト', 'distan' ); ?></a></p>
+					</details>
+				</template>
+
 				<template x-if="manifest && manifest.broken && manifest.broken.length">
 					<details class="hgp-details is-error">
 						<summary>
@@ -917,7 +947,7 @@ class Distan_Admin {
 
 			<!-- Settings -->
 			<section class="hgp-card" id="distan-settings">
-				<form method="post" action="options.php">
+				<form method="post" action="options.php" x-data='<?php echo esc_attr( (string) wp_json_encode( array( 'productionUrl' => (string) $settings['site_url'] ) ) ); ?>'>
 					<?php settings_fields( 'distan_settings_group' ); ?>
 
 					<div class="hgp-card__head">
@@ -933,11 +963,11 @@ class Distan_Admin {
 							</th>
 							<td>
 								<input type="url" id="distan-site-url" class="regular-text"
-									name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[site_url]"
+									name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[site_url]" x-model="productionUrl"
 									value="<?php echo esc_attr( (string) $settings['site_url'] ); ?>"
 									placeholder="https://example.com/">
 								<p class="description">
-									<?php esc_html_e( 'canonical と OGP にのみ使います。内部リンクはドキュメント相対で書き出すため、設置場所は選びません。', 'distan' ); ?>
+									<?php esc_html_e( 'canonical・OGP・構造化データなどに使う本番URLです。構造化データの自動追加には設定が必要です。内部リンクを相対で書き出す場合も、ここには本番URLを指定してください。', 'distan' ); ?>
 								</p>
 							</td>
 						</tr>
@@ -1146,6 +1176,22 @@ class Distan_Admin {
 									<?php endif; ?>
 								</div>
 
+							</td>
+						</tr>
+						<tr id="set-schema" x-data="{ schemaOn: <?php echo ! empty( $settings['schema'] ) ? 'true' : 'false'; ?> }">
+							<th scope="row"><?php esc_html_e( '構造化データ（schema.org）', 'distan' ); ?></th>
+							<td>
+								<label>
+									<input type="checkbox" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[schema]" x-model="schemaOn" value="1" <?php checked( ! empty( $settings['schema'] ) ); ?>>
+									<?php esc_html_e( '構造化データがないページに基本情報を追加する', 'distan' ); ?>
+								</label>
+								<p class="description"><?php esc_html_e( '静的HTMLに WebPage の JSON-LD（公開URL・ページタイトル・説明・言語）を追加します。タイトル・説明・言語はページにある情報だけを使います。テーマやSEOプラグインなどのJSON-LDがあるページには追加しません。公開URLの設定が必要です。404ページには追加しません。', 'distan' ); ?></p>
+								<p class="hgp-alert is-warn" x-show="schemaOn &amp;&amp; ! productionUrl.trim()" x-cloak><?php esc_html_e( '公開URLが空欄です。チェックがオンでも自動追加されません。公開URLを入力し、設定を保存してから生成してください。', 'distan' ); ?></p>
+								<p><label for="distan-schema-dirs"><?php esc_html_e( '自動追加から除外するディレクトリ（1行に1つ）', 'distan' ); ?></label></p>
+								<textarea id="distan-schema-dirs" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[schema_exclude_dirs]" rows="3" class="large-text code" placeholder="/private/&#10;/members/"><?php echo esc_textarea( (string) $settings['schema_exclude_dirs'] ); ?></textarea>
+								<p><label for="distan-schema-pages"><?php esc_html_e( '自動追加から除外するページ（1行に1つ）', 'distan' ); ?></label></p>
+								<textarea id="distan-schema-pages" name="<?php echo esc_attr( Distan::OPTION_KEY ); ?>[schema_exclude_pages]" rows="3" class="large-text code" placeholder="/contact/thanks/&#10;/privacy/"><?php echo esc_textarea( (string) $settings['schema_exclude_pages'] ); ?></textarea>
+								<p class="description"><?php esc_html_e( 'WordPress側のサイトURLからのパスを / で始めて指定します。ディレクトリはその直下と配下全体、ページはそのパスだけが対象です。末尾の / の有無は区別せず、クエリ違いも同じページとして扱います。除外やチェックの解除はDistanの自動追加だけに効き、既存のJSON-LDやページの書き出しは維持します。変更は再生成後に反映されます。', 'distan' ); ?></p>
 							</td>
 						</tr>
 						<tr id="set-sitemap">
