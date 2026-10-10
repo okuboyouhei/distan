@@ -24,7 +24,7 @@ function trailingslashit( $value ) { return rtrim( $value, '/' ) . '/'; }
 function untrailingslashit( $value ) { return rtrim( $value, '/' ); }
 function wp_parse_url( $url, $component = -1 ) { return parse_url( $url, $component ); }
 function wp_json_encode( $data, $flags = 0 ) { return json_encode( $data, $flags ); }
-function apply_filters( $name, $value, ...$args ) { global $replacements; return 'distan_url_replacements' === $name ? $replacements : $value; }
+function apply_filters( $name, $value, ...$args ) { global $replacements, $test_manifest_source; if ( 'distan_manifest_source' === $name ) { return $test_manifest_source ?? $value; } return 'distan_url_replacements' === $name ? $replacements : $value; }
 function esc_url_raw( $value ) { return $value; }
 function sanitize_textarea_field( $value ) { return strip_tags( $value ); }
 function sanitize_key( $value ) { return strtolower( preg_replace( '/[^a-zA-Z0-9_-]/', '', $value ) ); }

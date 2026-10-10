@@ -64,6 +64,9 @@ class Distan_Admin {
 		}
 
 		$manifest = Distan_Generator::manifest();
+		if ( ! Distan_Report::is_complete( $manifest ) ) {
+			wp_die( esc_html__( '生成が完了していないためZIPを作成できません。生成中の場合は完了を待ち、失敗・中断した場合は再生成してください。', 'distan' ) );
+		}
 		$zip_path = Distan_Report::build_zip( $manifest );
 
 		if ( null === $zip_path || ! is_file( $zip_path ) ) {
@@ -89,6 +92,9 @@ class Distan_Admin {
 		}
 
 		$manifest = Distan_Generator::manifest();
+		if ( ! Distan_Report::is_complete( $manifest ) ) {
+			wp_die( esc_html__( '生成が完了していないためZIPを作成できません。生成中の場合は完了を待ち、失敗・中断した場合は再生成してください。', 'distan' ) );
+		}
 		$zip_path = Distan_Report::build_diff_zip( $manifest );
 
 		if ( null === $zip_path || ! is_file( $zip_path ) ) {
@@ -122,6 +128,9 @@ class Distan_Admin {
 		}
 
 		$manifest = Distan_Generator::manifest();
+		if ( ! Distan_Report::is_complete( $manifest ) ) {
+			wp_die( esc_html__( '生成が完了していないためZIPを作成できません。生成中の場合は完了を待ち、失敗・中断した場合は再生成してください。', 'distan' ) );
+		}
 		$zip_path = Distan_Report::build_template_zip( $page, $manifest );
 
 		if ( null === $zip_path || ! is_file( $zip_path ) ) {
@@ -205,15 +214,18 @@ class Distan_Admin {
 	private static function client_manifest(): ?array {
 		$stored = Distan_Generator::manifest();
 
-		if ( empty( $stored['files'] ) ) {
+		if ( empty( $stored ) ) {
 			return null;
 		}
 
 		$finished = (int) ( $stored['finished'] ?? 0 );
 
 		return array(
+			'complete'      => Distan_Report::is_complete( $stored ),
+			'in_progress'   => ! empty( $stored['in_progress'] ),
+			'errors'        => array_values( (array) ( $stored['errors'] ?? array() ) ),
 			'schema_diagnostics' => Distan_Schema_Audit::for_display( (array) ( $stored['schema_audit'] ?? array() ) ),
-			'files'          => array_values( (array) $stored['files'] ),
+			'files'          => array_values( (array) ( $stored['files'] ?? array() ) ),
 			'added'          => array_values( (array) ( $stored['added'] ?? array() ) ),
 			'cleaned'        => array_values( (array) ( $stored['cleaned'] ?? array() ) ),
 			'broken'         => array_values( (array) ( $stored['broken'] ?? array() ) ),
@@ -560,12 +572,14 @@ class Distan_Admin {
 					</p>
 				</div>
 
+				<p class="hgp-alert is-error" x-show="manifest &amp;&amp; manifest.complete === false" x-cloak><?php esc_html_e( '生成が完了していません。ZIP・テンプレート書き出し・デプロイは利用できません。生成中の場合は完了を待ち、失敗・中断した場合は再生成してください。差分は直前の成功時の記録と比較します。', 'distan' ); ?></p>
+
 				<template x-if="manifest">
 					<div class="hgp-downloads" id="distan-downloads">
 						<?php $dl_nonce = wp_create_nonce( 'distan_download' ); ?>
 						<?php if ( Distan_Report::can_zip() ) : ?>
 							<a class="button button-primary"
-								href="<?php echo esc_url( admin_url( 'admin-post.php?action=distan_download_zip&_wpnonce=' . $dl_nonce ) ); ?>">
+								x-show="manifest.complete !== false" href="<?php echo esc_url( admin_url( 'admin-post.php?action=distan_download_zip&_wpnonce=' . $dl_nonce ) ); ?>">
 								<?php esc_html_e( 'ZIPをダウンロード', 'distan' ); ?>
 							</a>
 						<?php else : ?>
@@ -574,12 +588,12 @@ class Distan_Admin {
 							</span>
 						<?php endif; ?>
 						<a class="button"
-							href="<?php echo esc_url( admin_url( 'admin-post.php?action=distan_download_report&_wpnonce=' . $dl_nonce ) ); ?>">
+							x-show="!manifest.in_progress" href="<?php echo esc_url( admin_url( 'admin-post.php?action=distan_download_report&_wpnonce=' . $dl_nonce ) ); ?>">
 							<?php esc_html_e( '差分レポート（.md）', 'distan' ); ?>
 						</a>
 						<?php if ( ! empty( $settings['diff_zip'] ) && Distan_Report::can_zip() ) : ?>
 							<a class="button"
-								href="<?php echo esc_url( admin_url( 'admin-post.php?action=distan_download_diff&_wpnonce=' . $dl_nonce ) ); ?>">
+								x-show="manifest.complete !== false" href="<?php echo esc_url( admin_url( 'admin-post.php?action=distan_download_diff&_wpnonce=' . $dl_nonce ) ); ?>">
 								<?php esc_html_e( '差分ZIP（変更分のみ）', 'distan' ); ?>
 							</a>
 						<?php endif; ?>
@@ -591,7 +605,7 @@ class Distan_Admin {
 					$diff_source   = Distan_Generator::manifest_source();
 					$diff_manifest = Distan_Generator::manifest();
 					$diff_finished = isset( $diff_manifest['finished'] ) ? (int) $diff_manifest['finished'] : 0;
-					$diff_has_base = ! empty( $diff_manifest['files'] );
+					$diff_has_base = ! empty( $diff_manifest['diff_baseline']['files'] ) || ( Distan_Report::is_complete( $diff_manifest ) && ! empty( $diff_manifest['files'] ) );
 					$diff_when     = $diff_finished > 0
 						? get_date_from_gmt( gmdate( 'Y-m-d H:i:s', $diff_finished ), 'Y-m-d H:i' )
 						: '';
@@ -637,7 +651,7 @@ class Distan_Admin {
 					}
 					sort( $tpl_pages );
 					?>
-					<?php if ( ! empty( $tpl_pages ) ) : ?>
+					<?php if ( Distan_Report::is_complete( $tpl_manifest ) && ! empty( $tpl_pages ) ) : ?>
 						<?php
 						// Build the candidate list once, labelled from the manifest,
 						// and hand it to Alpine so the select can be filtered live by
@@ -654,7 +668,7 @@ class Distan_Admin {
 							);
 						}
 						?>
-						<form class="hgp-template" id="distan-template" method="get" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" x-data='{ q: "", pages: <?php echo esc_attr( (string) wp_json_encode( $tpl_list ) ); ?> }'>
+						<form x-show="manifest &amp;&amp; manifest.complete !== false &amp;&amp; !genRunning" class="hgp-template" id="distan-template" method="get" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" x-data='{ q: "", pages: <?php echo esc_attr( (string) wp_json_encode( $tpl_list ) ); ?> }'>
 							<input type="hidden" name="action" value="distan_download_template">
 							<?php wp_nonce_field( 'distan_download' ); ?>
 							<h3 class="hgp-template__title"><?php esc_html_e( 'テンプレート書き出し', 'distan' ); ?></h3>
@@ -794,7 +808,7 @@ class Distan_Admin {
 					</form>
 				<?php endif; ?>
 
-				<template x-if="manifest && dispatchEnabled">
+				<template x-if="manifest && manifest.complete !== false && dispatchEnabled">
 					<div class="hgp-dispatch">
 						<div class="hgp-dispatch__action">
 							<button type="button" class="button button-primary" @click="dispatch()" :disabled="dispatching">

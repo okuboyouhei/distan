@@ -43,7 +43,7 @@ WordPress を制作環境として使い、納品用の静的 HTML を書き出�
 - **初回納品** — 全体 ZIP をダウンロードして納品・アップロード。
 - **更新** — WordPress で編集 → 再生成 → 「差分ZIP」（変更ファイル＋削除指示の `DELETE.txt`）を本番に上書き。全体を上げ直さない。
 - **差分の基準** — 生成とデプロイが同じ環境なら既定 `db` のまま。別環境（ローカルや CI で生成 → 別サーバーへ納品）なら `distan_manifest_source` を `output` にして、差分の基準を成果物と一緒に運ぶ。
-- **デプロイ自動化** — `distan_after_generate`（毎回発火）/ `distan_dispatch`（手動ボタン）フックに rsync・git push・Webhook 等を繋ぐ。Distan 自体はデプロイせず、認証情報も持たない。
+- **デプロイ自動化** — `distan_after_generate`（エラーなく完了時に発火）/ `distan_dispatch`（手動ボタン）フックに rsync・git push・Webhook 等を繋ぐ。Distan 自体はデプロイせず、認証情報も持たない。
 
 ## トラブル対処
 
@@ -83,7 +83,7 @@ WordPress を制作環境として使い、納品用の静的 HTML を書き出�
 - **テンプレート候補のライブ絞り込み** — 候補は wp_json_encode で Alpine の x-data に渡し、`<template x-for>` で option をタイトル部分一致フィルタ描画（q は type=search 入力、送信は既存の GET のまま）。生成経路には非依存＝フロント完結
   - テンプレートマーカー（通常生成・テンプレート書き出しの両方で有効）: HTMLコメント `<!-- distan:no-block-styles -->`（wp-block-library/-theme の link ＋ id が `wp-block-` で始まる/`global-styles` を含むインライン `<style>` を全除去。placeholder や per-block の *-inline-css も対象。`wp-img-auto-sizes-*` も対象）と `<!-- distan:drop-assets <prefix>... -->`（src/href を出力相対パスに解決し前方一致でスクリプト/スタイルを除去。plugin/core は畳まれず wp-content/plugins/・wp-includes/ のまま残るのでその構造で指定）。トップレベルの link/script のみ対象で、残した CSS の url() 追従先には触れない（dangling を作らない）。参照タグごと除去＋マーカーコメント自体も除去。推定はせず宣言に従う。実装は `clean_template_html` / `parse_template_markers`。通常生成でも `Distan_Report::apply_page_markers` を書き出し直前に適用し、該当 `<link>`/`<script>`＋inline block styles を除去（マーカーコメントも除去）。**共有アセットのファイル実体は削除しない**＝そのページの参照タグだけ外す（他ページは無傷）。テンプレート書き出しは従来どおりファイル収集からも除外
 - **生成完了フック** — `distan_after_generate`（アクション）で、生成後に任意のデプロイ処理（git push / rsync / Webhook 等）を繋げる。Distan 自体はデプロイしない・認証情報を持たない
-- **デプロイフック** — `distan_dispatch`（アクション）は、生成物を目視確認したあと手動の「デプロイ」ボタンを押したときだけ発火する。`distan_after_generate` が自動（生成のたびに必ず発火）なのに対し、`distan_dispatch` は人間のゲート。プレビュー配信は前者、本番へのデプロイは後者、と二層に分けられる。承認状態は持たず、最終デプロイ時刻（`distan_last_dispatch`）だけを記録する。ボタンは既定オフ、設定で有効化
+- **デプロイフック** — `distan_dispatch`（アクション）は、生成物を目視確認したあと手動の「デプロイ」ボタンを押したときだけ発火する。`distan_after_generate` が自動（記録された生成エラーがない完了時に発火）なのに対し、`distan_dispatch` は人間のゲート。プレビュー配信は前者、本番へのデプロイは後者、と二層に分けられる。承認状態は持たず、最終デプロイ時刻（`distan_last_dispatch`）だけを記録する。ボタンは既定オフ、設定で有効化
 
 ## できないこと / やらないこと
 
@@ -121,3 +121,12 @@ WordPress を制作環境として使い、納品用の静的 HTML を書き出�
 ## 開発URL診断の共通化（1.9.1）
 
 Distan_Url_Auditがホスト・ポート・パス範囲の判定を共通化。生成器は保存ファイルの検査用コピーでスラッシュ/Unicodeエスケープを読み取り、JSON-LD診断はデコード済みの値を同じ判定へ渡す。公開元と同じ公開先は警告しない。既定ポートを正規化し、別ポート・似た別ホスト・パス境界を区別する。全体はURL出現数、JSON-LDは問題のページ/ブロック単位であり集計単位は異なる。HTMLの自動修正・外部通信はしない。
+
+
+## 失敗・中断時の配布と差分（1.9.2）
+
+生成開始前にmanifest.complete=falseを保存し、直前の成功記録のfiles/hashes/entriesをdiff_baselineに保持する。ジョブ消失・途中停止でも配布を再開しない。失敗時のadded/modified/removedは未確定として空、errorsを保持。次回成功時の差分は成功記録から計算する。DB/output両方式、旧manifest（completeなし）との互換性を保つ。既に失われた旧版の成功記録は復元しない。
+
+全体・差分・テンプレートZIPと手動dispatchは未完了のmanifestを拒否。生成完了フックは記録されたエラーなしの場合だけ発火する（1.9.1以前からの変更）。ページ取得・保存に加えて、キューに入ったアセットの読み取り/コピー失敗もerrorsに入れ、CSSで発見した参照アセットをmanifestと掃除の保持対象に含める。警告やリンク切れは生成失敗とは別。ファイルは逐次上書きで、ロールバックではない。同時実行の厳密な排他や生成中の設定変更は本修正の範囲外。
+
+回帰検証: `php tests/generation-failure.php`（GitHub版のみ）。LocalでのPlugin Check・画面確認は別途行う。

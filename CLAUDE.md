@@ -136,11 +136,11 @@ wp-content/uploads/2026/07/x            →  media/2026/07/x
 
 ## 生成完了フック（`distan_after_generate`）
 
-全バッチ完了後、マニフェストとレポートを書き出した直後に一度だけ `do_action( 'distan_after_generate', $manifest, $output_root )` を発火する。**Distan はデプロイを行わない**——このフックは git push / rsync / SFTP / Netlify・Cloudflare Pages の Webhook などを繋ぐための seam。プラグインがデプロイ資格情報やホスト固有の知識を持たずに済むよう、意図的に「知らせるだけ」にしている。本番に WordPress を置かない SSG＋自動デプロイ構成の要。
+全バッチが記録されたエラーなしで完了した場合、マニフェストとレポートを書き出した直後に一度だけ `do_action( 'distan_after_generate', $manifest, $output_root )` を発火する。**Distan はデプロイを行わない**——このフックは git push / rsync / SFTP / Netlify・Cloudflare Pages の Webhook などを繋ぐための seam。プラグインがデプロイ資格情報やホスト固有の知識を持たずに済むよう、意図的に「知らせるだけ」にしている。本番に WordPress を置かない SSG＋自動デプロイ構成の要。
 
 ## デプロイフック（`distan_dispatch`）
 
-`distan_after_generate` が**自動**（生成のたびに必ず発火・状態なし）なのに対し、`distan_dispatch` は**手動の人間ゲート**。生成画面の「デプロイ」ボタン（設定 `enable_dispatch`、既定オフ）を押したときだけ、AJAX ハンドラ `Distan_Ajax::dispatch()` が最後のマニフェストを読んで `do_action( 'distan_dispatch', $manifest, $now )` を発火する。
+`distan_after_generate` が**自動**（記録された生成エラーがない完了時に発火・状態なし）なのに対し、`distan_dispatch` は**手動の人間ゲート**。生成画面の「デプロイ」ボタン（設定 `enable_dispatch`、既定オフ）を押したときだけ、AJAX ハンドラ `Distan_Ajax::dispatch()` が最後のマニフェストを読んで `do_action( 'distan_dispatch', $manifest, $now )` を発火する。
 
 設計上の要点は「**承認状態を持たない**」こと。「この生成物は OK / NG」という判断を記録すると状態遷移の管理が生まれ、v0.9.16 で引いた「Distan はデプロイをやらない／腐るものを持ち込まない」の線を内側に越える。だから記録するのは `distan_last_dispatch`（最終デプロイ時刻の option 一個）だけ——生成物とも判断とも紐づかない、ただの事実。画面には「最終生成」（`manifest.finished`）と「最終デプロイ」の二行をモノスペースで並べるにとどめ、誰が・何回・デプロイログ一覧、までは踏み込まない（そこは監査ログの領域）。
 
@@ -221,3 +221,12 @@ define( 'WP_DEBUG_DISPLAY', false );
 - 管理画面の UI は Alpine.js（同梱、CDN 不使用）。ビルド工程は持ちません
 - Alpine より先に自前スクリプトを読み込むため、**Alpine 側の依存として自前スクリプトを宣言**します（逆にすると `x-data` のコンポーネントが未定義になります）
 - 翻訳ファイルは配布物に同梱しません（WordPress.org の規約）
+
+
+## 失敗・中断時の配布と差分（1.9.2）
+
+生成開始前にmanifest.complete=falseを保存し、直前の成功記録のfiles/hashes/entriesをdiff_baselineに保持する。ジョブ消失・途中停止でも配布を再開しない。失敗時のadded/modified/removedは未確定として空、errorsを保持。次回成功時の差分は成功記録から計算する。DB/output両方式、旧manifest（completeなし）との互換性を保つ。既に失われた旧版の成功記録は復元しない。
+
+全体・差分・テンプレートZIPと手動dispatchは未完了のmanifestを拒否。生成完了フックは記録されたエラーなしの場合だけ発火する（1.9.1以前からの変更）。ページ取得・保存に加えて、キューに入ったアセットの読み取り/コピー失敗もerrorsに入れ、CSSで発見した参照アセットをmanifestと掃除の保持対象に含める。警告やリンク切れは生成失敗とは別。ファイルは逐次上書きで、ロールバックではない。同時実行の厳密な排他や生成中の設定変更は本修正の範囲外。
+
+回帰検証: `php tests/generation-failure.php`（GitHub版のみ）。LocalでのPlugin Check・画面確認は別途行う。

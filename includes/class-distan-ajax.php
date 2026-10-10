@@ -81,7 +81,7 @@ class Distan_Ajax {
 		if ( ! empty( $state['done'] ) ) {
 			$state['manifest'] = Distan_Generator::manifest();
 			$state['manifest']['schema_diagnostics'] = Distan_Schema_Audit::for_display( (array) ( $state['manifest']['schema_audit'] ?? array() ) );
-			unset( $state['manifest']['schema_audit'] );
+			unset( $state['manifest']['schema_audit'], $state['manifest']['diff_baseline'] );
 		}
 
 		wp_send_json_success( $state );
@@ -112,9 +112,9 @@ class Distan_Ajax {
 
 		$manifest = Distan_Generator::manifest();
 
-		if ( empty( $manifest['files'] ) ) {
+		if ( ! Distan_Report::is_complete( $manifest ) ) {
 			wp_send_json_error(
-				array( 'message' => __( 'デプロイできる生成物がありません。先に生成を実行してください。', 'distan' ) ),
+				array( 'message' => __( '生成が完了していないためデプロイできません。生成中の場合は完了を待ち、失敗・中断した場合は再生成してください。', 'distan' ) ),
 				400
 			);
 		}

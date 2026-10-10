@@ -70,7 +70,7 @@
 			genIndex: 0,
 			genTotal: 0,
 			genAssets: 0,
-			genErrors: [],
+			genErrors: ( data.manifest && data.manifest.errors ) || [],
 			manifest: data.manifest || null,
 
 			dispatchEnabled: !! data.dispatchEnabled,

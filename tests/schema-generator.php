@@ -37,6 +37,9 @@ $queue = array(
 	array( 'url' => $home . '/ok/', 'path' => 'ok/index.html', 'type' => 'page', 'label' => 'OK' ),
 	array( 'url' => $home . '/fail/', 'path' => 'fail/index.html', 'type' => 'page', 'label' => 'Fail' ),
 );
+// Establish a successful baseline before exercising a partially failed run.
+set_transient( Distan_Generator::JOB_KEY, new_job( array( $queue[0] ) ), 3600 );
+Distan_Generator::process_batch( 1 );
 set_transient( Distan_Generator::JOB_KEY, new_job( $queue ), 3600 );
 $state = Distan_Generator::process_batch( 1 );
 check( ! $state['done'] && 1 === $state['written'], 'Real batch writes successful page' );
@@ -54,11 +57,7 @@ $client_method = new ReflectionMethod( Distan_Admin::class, 'client_manifest' );
 $client_method->setAccessible( true );
 $client = $client_method->invoke( null );
 check( 2 === $client['schema_diagnostics']['total'] && 1 === $client['schema_diagnostics']['incomplete_pages'], 'Reloaded admin uses persisted diagnostic snapshot' );
-$zip_path = Distan_Report::build_zip( $manifest );
-$zip = new ZipArchive();
-check( is_string( $zip_path ) && true === $zip->open( $zip_path ), 'Full ZIP created from actual generation' );
-check( $bytes === $zip->getFromName( 'ok/index.html' ) && str_contains( $zip->getFromName( 'distan-report.md' ), '構造化データの診断' ), 'ZIP preserves output and includes audit report' );
-$zip->close();
+check( null === Distan_Report::build_zip( $manifest ), 'Failed generation cannot produce a full ZIP' );
 $saved = array( 'schema' => false, 'site_url' => 'https://different.test' );
 check( $report === Distan_Report::render( $manifest ), 'Changing settings does not change report from completed run' );
 set_transient( Distan_Generator::JOB_KEY, new_job( array( $queue[0] ) ), 3600 );
@@ -66,6 +65,11 @@ Distan_Generator::process_batch( 1 );
 $next = Distan_Generator::manifest();
 check( array( 'ok/index.html' ) === $next['modified'] && 'disabled' === $next['schema_audit']['pages']['ok/index.html']['status'], 'Switching off changes page hash and records disabled outcome' );
 check( ! str_contains( file_get_contents( $test_uploads . '/distan/dist/ok/index.html' ), 'distan-schema' ), 'Only auto-added markup disappears from file' );
+$zip_path = Distan_Report::build_zip( $next );
+$zip = new ZipArchive();
+check( is_string( $zip_path ) && true === $zip->open( $zip_path ), 'Full ZIP created from actual generation' );
+check( file_get_contents( $test_uploads . '/distan/dist/ok/index.html' ) === $zip->getFromName( 'ok/index.html' ) && str_contains( $zip->getFromName( 'distan-report.md' ), '構造化データの診断' ), 'ZIP preserves output and includes audit report' );
+$zip->close();
 $diff = Distan_Report::build_diff_zip( $next );
 $zip = new ZipArchive();
 check( is_string( $diff ) && true === $zip->open( $diff ) && false !== $zip->getFromName( 'ok/index.html' ), 'Differential ZIP contains changed page' );

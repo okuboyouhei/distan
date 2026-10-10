@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.9.1
+Stable tag: 1.9.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -70,7 +70,7 @@ No. The output is static HTML. The delivered site does not require the WordPress
 
 = How do I deploy the result? =
 
-Distan does not deploy for you and never stores server credentials. It fires `distan_after_generate` when a run finishes, and an optional `distan_dispatch` action when you press the deploy button after reviewing the output. Hook either one to your own rsync, git push, FTP, or CI step. You can also just download the ZIP.
+Distan does not deploy for you and never stores server credentials. It fires `distan_after_generate` when a run finishes without recorded errors, and an optional `distan_dispatch` action when you press the deploy button after reviewing the output. Hook either one to your own rsync, git push, FTP, or CI step. You can also just download the ZIP.
 
 = Do template functions work? =
 
@@ -106,6 +106,12 @@ Yes, with an explicit opt-in. Name the query keys that change the page with the 
 2. 「使い方」ヘルプ。Distan の考え方（WordPress は作る場所、書き出した HTML が納品物）と、環境の確認 → 書き出し → 受け取り・公開の流れ、主な設定の要点を確認できます。
 
 == Changelog ==
+
+= 1.9.2 =
+* Fixed failed pages being listed as production deletion candidates. Failed or interrupted runs retain the last successful diff baseline, so a successful retry includes all changed pages and genuine removals.
+* Blocked full, differential and template ZIP exports and manual dispatch until generation succeeds. Incomplete status and recorded errors remain visible after reloading the admin screen.
+* The distan_after_generate hook now fires only when generation finishes without recorded errors. Review integrations that previously used this hook to observe failed runs.
+* Asset read/copy failures now mark the run incomplete. Assets discovered inside CSS are recorded and retained during output cleanup.
 
 = 1.9.1 =
 * Refactored: output-file and JSON-LD development URL checks now share one read-only detector with explicit environment inputs. Generated HTML and existing JSON-LD are not rewritten by diagnostics.

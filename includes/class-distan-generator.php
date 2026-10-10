@@ -64,6 +64,9 @@ class Distan_Generator {
 			'user_id'     => get_current_user_id(),
 		);
 
+		// Invalidate delivery before any output can be overwritten. This persists
+		// even if the browser closes or the job transient expires.
+		self::write_manifest( array_merge( $job, array( 'in_progress' => true ) ) );
 		set_transient( self::JOB_KEY, $job, HOUR_IN_SECONDS );
 
 		return self::public_state( $job );
@@ -125,6 +128,12 @@ class Distan_Generator {
 			);
 		}
 
+		// Also protect jobs started before an update to 1.9.2.
+		$record = self::manifest();
+		if ( 0 === (int) $job['index'] || ! isset( $record['complete'] ) || false !== $record['complete'] ) {
+			self::write_manifest( array_merge( $job, array( 'in_progress' => true ) ) );
+		}
+
 		// Keep the run's heartbeat fresh so running_job() sees it as alive.
 		// It is written back with the job below (or cleared on completion).
 		$job['heartbeat'] = time();
@@ -180,6 +189,8 @@ class Distan_Generator {
 
 			$assets_result        = self::copy_assets( $job['assets'] );
 			$job['assets_copied'] = $assets_result['copied'];
+			$job['assets']        = $assets_result['assets'];
+			$job['errors']        = array_merge( $job['errors'], $assets_result['errors'] );
 			$job['large_files']   = $assets_result['large_files'];
 			$job['broken']        = self::audit_links( $job['written'] );
 
@@ -223,7 +234,7 @@ class Distan_Generator {
 			);
 
 			/**
-			 * Fires once, after a full generation run has finished and the
+			 * Fires once, after an error-free generation run has finished and the
 			 * manifest and report are written.
 			 *
 			 * Distan itself does not deploy — it only writes files to the
@@ -239,7 +250,9 @@ class Distan_Generator {
 			 * @param string $output_root Absolute path to the output directory
 			 *                             (uploads/distan/dist).
 			 */
-			do_action( 'distan_after_generate', self::manifest(), Distan_Paths::output_root() );
+			if ( empty( $job['errors'] ) ) {
+				do_action( 'distan_after_generate', self::manifest(), Distan_Paths::output_root() );
+			}
 
 			delete_transient( self::JOB_KEY );
 		} else {
@@ -366,6 +379,8 @@ class Distan_Generator {
 	 */
 	private static function copy_assets( array $assets ): array {
 		$copied      = 0;
+		$written     = array();
+		$errors      = array();
 		$large_files = array(); // relative => size in bytes (for the report).
 
 		/**
@@ -393,6 +408,7 @@ class Distan_Generator {
 			$done[ $relative ] = true;
 
 			if ( ! is_file( $source ) || ! is_readable( $source ) ) {
+				$errors[] = array( 'url' => $relative, 'message' => __( 'アセットを読み込めませんでした。', 'distan' ) );
 				continue;
 			}
 
@@ -411,6 +427,7 @@ class Distan_Generator {
 				$contents = file_get_contents( $source ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_get_contents
 
 				if ( false === $contents ) {
+					$errors[] = array( 'url' => $relative, 'message' => __( 'CSSを読み込めませんでした。', 'distan' ) );
 					continue;
 				}
 
@@ -426,6 +443,9 @@ class Distan_Generator {
 
 				if ( Distan_Paths::write( $relative, $contents ) ) {
 					$copied++;
+					$written[ $relative ] = $source;
+				} else {
+					$errors[] = array( 'url' => $relative, 'message' => __( 'CSSを書き込めませんでした。', 'distan' ) );
 				}
 			} else {
 				// Binary assets (images, PDFs, fonts, video) are not
@@ -433,12 +453,17 @@ class Distan_Generator {
 				// files whole into memory.
 				if ( Distan_Paths::copy_stream( $relative, $source ) ) {
 					$copied++;
+					$written[ $relative ] = $source;
+				} else {
+					$errors[] = array( 'url' => $relative, 'message' => __( 'アセットをコピーできませんでした。', 'distan' ) );
 				}
 			}
 		}
 
 		return array(
 			'copied'      => $copied,
+			'assets'      => $written,
+			'errors'      => $errors,
 			'large_files' => $large_files,
 		);
 	}
@@ -829,7 +854,17 @@ class Distan_Generator {
 			}
 		}
 
+		$complete = empty( $job['errors'] ) && empty( $job['in_progress'] );
+		if ( ! $complete ) {
+			$removed  = array();
+			$added    = array();
+			$modified = array();
+		}
+
 		$data = array(
+			'complete' => $complete,
+			'in_progress' => ! empty( $job['in_progress'] ),
+			'errors'   => $job['errors'] ?? array(),
 			'version'  => 2,
 			'schema_audit' => Distan_Schema_Audit::summarize( $job['schema_pages'] ?? array() ),
 			'files'    => $current,
@@ -847,7 +882,7 @@ class Distan_Generator {
 			'has_modules' => ! empty( $job['has_modules'] ),
 			'large_files' => isset( $job['large_files'] ) ? $job['large_files'] : array(),
 			'sitemap_missing' => isset( $job['sitemap_missing'] ) ? $job['sitemap_missing'] : array(),
-			'finished' => time(),
+			'finished' => ! empty( $job['in_progress'] ) ? 0 : time(),
 			// Environment facts, stamped as-generated so consumers (report,
 			// diff, template export) can interpret the artifact by reading the
 			// manifest instead of asking WordPress. A setting changed after
@@ -857,6 +892,11 @@ class Distan_Generator {
 			'link_style' => Distan::settings()['link_style'],
 			'site_url'   => (string) Distan::settings()['site_url'],
 		);
+
+		// Keep only the comparison facts, never a recursive history of failures.
+		if ( ! $complete ) {
+			$data['diff_baseline'] = array_intersect_key( $previous_manifest, array_flip( array( 'files', 'hashes', 'entries' ) ) );
+		}
 
 		// The option is always written: it powers the admin status line, and
 		// in 'output' mode it is the same-environment fallback baseline.
@@ -919,7 +959,7 @@ class Distan_Generator {
 				if ( false !== $raw ) {
 					$decoded = json_decode( $raw, true );
 					if ( is_array( $decoded ) ) {
-						return $decoded;
+						return self::successful_baseline( $decoded );
 					}
 				}
 			}
@@ -927,7 +967,22 @@ class Distan_Generator {
 
 		$option = get_option( self::MANIFEST_KEY, array() );
 
-		return is_array( $option ) ? $option : array();
+		return self::successful_baseline( is_array( $option ) ? $option : array() );
+	}
+
+	/**
+	 * Resolve the last successful comparison, accepting legacy manifests.
+	 *
+	 * @param array<string, mixed> $manifest Recorded run.
+	 * @return array<string, mixed>
+	 */
+	private static function successful_baseline( array $manifest ): array {
+		if ( isset( $manifest['complete'] ) && false === $manifest['complete'] ) {
+			return isset( $manifest['diff_baseline'] ) && is_array( $manifest['diff_baseline'] )
+				? $manifest['diff_baseline'] : array();
+		}
+
+		return $manifest;
 	}
 
 	/**

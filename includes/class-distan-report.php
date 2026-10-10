@@ -36,6 +36,16 @@ class Distan_Report {
 	public const ZIP_TEMPLATE_README_NAME = 'README.md';
 
 	/**
+	 * Whether a recorded run can be delivered. Legacy manifests remain usable.
+	 *
+	 * @param array<string, mixed> $manifest Recorded generation.
+	 */
+	public static function is_complete( array $manifest ): bool {
+		return ! empty( $manifest['files'] )
+			&& ( ! isset( $manifest['complete'] ) || false !== $manifest['complete'] );
+	}
+
+	/**
 	 * Build the Markdown report for a finished run and save a timestamped
 	 * copy to the work directory (kept as history, never inside dist/).
 	 *
@@ -99,6 +109,11 @@ class Distan_Report {
 		$lines[] = '- リンク書式: ' . $link_style;
 		$lines[] = '- サイト: ' . $site;
 		$lines[] = '';
+		if ( isset( $manifest['complete'] ) && false === $manifest['complete'] ) {
+			$lines[] = '**生成が完了していません。納品前に再生成してください。**';
+			$lines[] = '差分と削除候補は未確定です。次回は直前の成功時の記録と比較します。';
+			$lines[] = '';
+		}
 		$lines[] = '## サマリ';
 		$lines[] = '';
 		$lines[] = '| 項目 | 件数 |';
@@ -331,7 +346,7 @@ class Distan_Report {
 	 * @return string|null Absolute path to the ZIP, or null on failure.
 	 */
 	public static function build_zip( array $manifest, array $meta = array() ): ?string {
-		if ( ! self::can_zip() ) {
+		if ( ! self::is_complete( $manifest ) || ! self::can_zip() ) {
 			return null;
 		}
 
@@ -402,7 +417,7 @@ class Distan_Report {
 	 * @return string|null Absolute path to the ZIP, or null.
 	 */
 	public static function build_diff_zip( array $manifest, array $meta = array() ): ?string {
-		if ( ! self::can_zip() ) {
+		if ( ! self::is_complete( $manifest ) || ! self::can_zip() ) {
 			return null;
 		}
 
@@ -568,7 +583,7 @@ class Distan_Report {
 	 * @return string|null Absolute path to the ZIP, or null on failure.
 	 */
 	public static function build_template_zip( string $page, array $manifest, array $meta = array() ): ?string {
-		if ( ! self::can_zip() ) {
+		if ( ! self::is_complete( $manifest ) || ! self::can_zip() ) {
 			return null;
 		}
 
