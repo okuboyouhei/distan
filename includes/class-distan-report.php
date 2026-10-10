@@ -121,7 +121,7 @@ class Distan_Report {
 			$lines[] = '';
 			$lines[] = '生成物に開発環境のドメイン（' . $site . '）を指すURLが ' . $dev_count . ' 件残っています。';
 			$lines[] = 'canonical・OGP・構造化データ（JSON-LD）など、Distan が書き換えずに運ぶ絶対URLで起きます。';
-			$lines[] = '「公開URL」を設定して再生成すると、本番のドメインに置き換わります。';
+			$lines[] = '公開URLと置換設定を確認し、再生成後に残存がないか確認してください。JSON内のエスケープ表記など、基本のドメイン置換では届かない場合があります。';
 			$lines[] = '';
 			if ( ! empty( $dev_files ) ) {
 				$lines[] = '| 残っているページ |';

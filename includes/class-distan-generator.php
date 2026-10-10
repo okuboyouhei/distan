@@ -488,20 +488,7 @@ class Distan_Generator {
 	private static function audit_dev_urls( array $written ): array {
 		$root = Distan_Paths::output_root();
 
-		$home = wp_parse_url( home_url( '/' ) );
-		$host = isset( $home['host'] ) ? (string) $home['host'] : '';
-
-		if ( '' === $host ) {
-			return array(
-				'count' => 0,
-				'files' => array(),
-			);
-		}
-
-		// Match the development host as it appears inside URLs, e.g.
-		// "http://distan.local/…". Both raw and percent-encoded slugs keep the
-		// host in ASCII, so a plain host match is enough.
-		$needle = '#https?://' . preg_quote( $host, '#' ) . '#i';
+		$environment = array( 'site' => home_url( '/' ), 'site_url' => (string) Distan::settings()['site_url'] );
 
 		$count = 0;
 		$files = array();
@@ -519,7 +506,7 @@ class Distan_Generator {
 				continue;
 			}
 
-			$hits = preg_match_all( $needle, $html );
+			$hits = Distan_Url_Audit::count_development_urls( $html, $environment );
 
 			if ( $hits ) {
 				$count   += $hits;

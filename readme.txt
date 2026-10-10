@@ -4,7 +4,7 @@ Tags: static site generator, static export, headless, jamstack, deploy
 Requires at least: 6.0
 Tested up to: 7.1
 Requires PHP: 8.0
-Stable tag: 1.9.0
+Stable tag: 1.9.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -106,6 +106,12 @@ Yes, with an explicit opt-in. Name the query keys that change the page with the 
 2. 「使い方」ヘルプ。Distan の考え方（WordPress は作る場所、書き出した HTML が納品物）と、環境の確認 → 書き出し → 受け取り・公開の流れ、主な設定の要点を確認できます。
 
 == Changelog ==
+
+= 1.9.1 =
+* Refactored: output-file and JSON-LD development URL checks now share one read-only detector with explicit environment inputs. Generated HTML and existing JSON-LD are not rewritten by diagnostics.
+* Fixed: escaped slashes and Unicode escapes in URL text are now inspected; similar hostnames and URL user-info no longer count as the development host. Source path boundaries, ports, Japanese paths and protocol-relative URLs use the shared rules. A production base matching the source base is not flagged.
+* Improved: development URL warnings explain that production URL settings alone may not replace escaped URLs. The environment check continues to read the saved generation record.
+* Updated: regression coverage and upgrade-testing instructions; upgrade tests preserve the installed plugin settings instead of deleting the old installation.
 
 = 1.9.0 =
 * Added: optional basic WebPage JSON-LD for pages without existing JSON-LD. Uses the production URL and actual output path, plus the title, description and language available in the HTML. Off by default; requires a production URL and skips 404 pages.

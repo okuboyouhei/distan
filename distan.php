@@ -3,7 +3,7 @@
  * Plugin Name: Distan
  * Plugin URI:  https://github.com/okuboyouhei/distan
  * Description: dist で開発する、WordPress静的サイトジェネレーター。HTML納品案件のために、WordPressを制作環境として使い、余計なものを含まない静的HTMLを書き出します。
- * Version:     1.9.0
+ * Version:     1.9.1
  * Author:      Youhei Okubo
  * License:     GPL-2.0-or-later
  * License URI: https://www.gnu.org/licenses/gpl-2.0.html
@@ -16,7 +16,7 @@
 
 defined( 'ABSPATH' ) || exit;
 
-define( 'DISTAN_VERSION', '1.9.0' );
+define( 'DISTAN_VERSION', '1.9.1' );
 define( 'DISTAN_FILE', __FILE__ );
 define( 'DISTAN_DIR', plugin_dir_path( __FILE__ ) );
 define( 'DISTAN_URL', plugin_dir_url( __FILE__ ) );
@@ -28,6 +28,7 @@ require_once DISTAN_DIR . 'includes/class-distan-urls.php';
 require_once DISTAN_DIR . 'includes/class-distan-collector.php';
 require_once DISTAN_DIR . 'includes/class-distan-generator.php';
 require_once DISTAN_DIR . 'includes/class-distan-schema.php';
+require_once DISTAN_DIR . 'includes/class-distan-url-audit.php';
 require_once DISTAN_DIR . 'includes/class-distan-schema-audit.php';
 require_once DISTAN_DIR . 'includes/class-distan-report.php';
 require_once DISTAN_DIR . 'includes/class-distan-markdown.php';
@@ -110,7 +111,7 @@ final class Distan {
 	 */
 	public static function defaults(): array {
 		return array(
-			'site_url'      => '',      // Production URL. Used for canonical / OGP only.
+			'site_url'      => '',      // Production URL for URL rewriting and optional structured data.
 			'path_style'    => 'directory', // 'directory' => /about/index.html, 'flat' => /about.html
 			'link_style'    => 'relative',  // 'relative' => document-relative, 'absolute' => production URL
 			'clean_html'    => true,

@@ -123,7 +123,7 @@ class Distan_Schema_Audit {
 			return;
 		}
 		if ( is_string( $value ) ) {
-			if ( self::is_development_url( $value, $env ) ) { self::issue( $row, 'dev_url', $block, 'warning', $value ); }
+			if ( Distan_Url_Audit::is_development_url( $value, $env ) ) { self::issue( $row, 'dev_url', $block, 'warning', $value ); }
 			return;
 		}
 		if ( is_array( $value ) ) {
@@ -191,21 +191,6 @@ class Distan_Schema_Audit {
 			return str_replace( '%25', '%', rawurlencode( $segment ) );
 		}, explode( '/', $path ) ) );
 		return $scheme . '://' . strtolower( $parts['host'] ) . ':' . $port . rtrim( $path, '/' ) . ( isset( $parts['query'] ) ? '?' . $parts['query'] : '' );
-	}
-
-	private static function is_development_url( string $url, array $env ): bool {
-		$dev = wp_parse_url( (string) ( $env['site'] ?? '' ) );
-		$pub = wp_parse_url( (string) ( $env['site_url'] ?? '' ) );
-		$target = wp_parse_url( $url );
-		if ( ! in_array( strtolower( $target['scheme'] ?? '' ), array( 'http', 'https' ), true ) ) { return false; }
-		if ( ! is_array( $dev ) || ! is_array( $target ) || empty( $dev['host'] ) || empty( $target['host'] ) ) { return false; }
-		if ( strtolower( $dev['host'] ) !== strtolower( $target['host'] ) ) { return false; }
-		$dev_path = rtrim( $dev['path'] ?? '', '/' );
-		$path = $target['path'] ?? '';
-		if ( '' !== $dev_path && $path !== $dev_path && ! str_starts_with( $path, $dev_path . '/' ) ) { return false; }
-		if ( is_array( $pub ) && strtolower( $pub['host'] ?? '' ) === strtolower( $dev['host'] )
-			&& ( $pub['port'] ?? 0 ) === ( $dev['port'] ?? 0 ) && rtrim( $pub['path'] ?? '', '/' ) === $dev_path ) { return false; }
-		return ( $target['port'] ?? 0 ) === ( $dev['port'] ?? 0 );
 	}
 
 	private static function issue( array &$row, string $code, int $block, string $level, string $detail = '' ): void {

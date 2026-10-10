@@ -60,6 +60,7 @@ consumer 側の機能を足すときの試金石は 2 つ。「これは工房�
 | `Distan_Urls` | URL 変換・パス平坦化・クエリ保持。**変換レイヤーの本体** |
 | `Distan_Collector` | 生成対象の列挙（`distan_sources` の合流とパス重複排除を含む） |
 | `Distan_Generator` | 生成・アセットコピー・掃除・リンク監査・マニフェスト |
+| `Distan_Url_Audit` | 開発URLの共通判定・検査用コピーの走査（設定や通信を参照しない） |
 | `Distan_Schema_Audit` | 完成HTMLの読み取り専用診断・集計・表示用データ（設定の直接参照なし） |
 | `Distan_Schema` | 任意の基本 WebPage JSON-LD追加（生成器専用、既存JSON-LD優先） |
 | `Distan_Sitemap_Audit` | コア sitemap の読み取りと突き合わせ（HTTP なし）。カバレッジ診断と、選択制の列挙シード |
@@ -129,7 +130,9 @@ wp-content/uploads/2026/07/x            →  media/2026/07/x
 
 診断の範囲と上限はREADMEに記載。重複@idは無条件に誤りとしない。単なる参照は無視、複数の定義は参考、name/urlが異なる場合は要確認。型の自動推測、外部context取得、語彙の完全検証、Google適格性判定は行わない。参照仕様: https://www.w3.org/TR/json-ld11/ 。
 
-回帰テストは `php tests/schema-generator.php`（単体＋バッチ・manifest・全体/差分/テンプレートZIPまで）。WordPress APIは一部スタブ化しており、LocalでのPlugin Checkと画面確認は別途必要。
+1.9.1では開発URLの判定を `Distan_Url_Audit` に共通化。生成器はファイル読み取りと集計を担当し、JSON-LD診断はデコードした値を同じ判定器へ渡す。検査用コピー以外のバイト列を変更しない。全体のURL出現数とJSON-LDの問題件数は別の集計。
+
+回帰テストは `php tests/development-urls.php`（開発URLの境界・表記揺れ・環境チェックまで含む）および `php tests/schema-generator.php`（単体＋バッチ・manifest・全体/差分/テンプレートZIPまで）。WordPress APIは一部スタブ化しており、LocalでのPlugin Checkと画面確認は別途必要。
 
 ## 生成完了フック（`distan_after_generate`）
 

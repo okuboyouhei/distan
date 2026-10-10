@@ -79,7 +79,7 @@ class Distan_Env {
 				self::STATUS_WARNING,
 				/* translators: %d: number of URLs. */
 				sprintf( __( '%d 件', 'distan' ), $count ),
-				__( '前回の生成物に開発環境のURLが残っていました。canonical・OGP・構造化データで起きます。「公開URL」を設定して再生成すると本番のドメインに置き換わります。', 'distan' )
+				__( '前回の生成物に開発環境のURLが残っていました。公開URLと置換設定を確認し、再生成後に残存を確認してください。JSON内のエスケープ表記など、基本の置換では届かない場合があります。', 'distan' )
 			);
 		}
 
